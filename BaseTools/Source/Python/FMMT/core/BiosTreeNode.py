@@ -4,6 +4,7 @@
 # Copyright (c) 2021-, Intel Corporation. All rights reserved.<BR>
 # SPDX-License-Identifier: BSD-2-Clause-Patent
 ##
+from FirmwareStorageFormat.UPLHeader import *
 from FirmwareStorageFormat.FvHeader import *
 from FirmwareStorageFormat.FfsFileHeader import *
 from FirmwareStorageFormat.SectionHeader import *
@@ -36,6 +37,42 @@ class BinaryNode:
         self.Name = "BINARY" + str(name)
         self.HOffset = 0
         self.Data = b''
+
+class ElfNode:
+    def __init__(self, buffer: bytes) -> None:
+        self.Header = ELF_HEADER64.from_buffer_copy(buffer)
+        self.ProList = []
+        self.SecList = []
+        self.UpldInfoSection = None
+        self.UpldInfo = None
+        if self.Header.ELF_Identification != b'\x7fELF\x02\x01\x01':
+            logger.error('Invalid Elf Header! Elf Identification {} is not ".ELF".'.format(self.Header.ELF_Identification))
+            raise Exception("Process Failed: Invalid ELF Header Identification!")
+        self.Name = "ELF"
+        self.HeaderLength = len(struct2stream(self.Header))
+        self.HOffset = 0
+        self.DOffset = 0
+        self.ROffset = 0
+        self.Data = b''
+        self.PadData = b''
+        self.Upld_Info_Align = False
+
+    def GetProgramList(self, buffer: bytes) -> None:
+        for i in range(self.Header.ELF_PHNum):
+            ElfProgramHeader = ELF_PROGRAM_HEADER64.from_buffer_copy(buffer[i*self.Header.ELF_PHEntSize:])
+            self.ProList.append(ElfProgramHeader)
+
+    def GetSectionList(self, buffer: bytes) -> None:
+        for i in range(self.Header.ELF_SHNum):
+            ElfSectionHeader = ELF_SECTION_HEADER64.from_buffer_copy(buffer[i*self.Header.ELF_SHEntSize:])
+            self.SecList.append(ElfSectionHeader)
+
+    def FindUPLDSection(self, buffer: bytes) -> None:
+        for item in self.SecList:
+            if buffer[item.SH_Offset:item.SH_Offset+4] == b'PLDH':
+                self.UpldInfoSection = item
+                self.UpldInfo = UNIVERSAL_PAYLOAD_INFO.from_buffer_copy(buffer[item.SH_Offset:item.SH_Offset+item.SH_Size])
+
 
 class FvNode:
     def __init__(self, name, buffer: bytes) -> None:
@@ -191,4 +228,4 @@ class FreeSpaceNode:
         self.HOffset = 0
         self.DOffset = 0
         self.ROffset = 0
-        self.PadData = b''
+        self.PadData = b''
