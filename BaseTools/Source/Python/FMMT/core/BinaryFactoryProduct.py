@@ -381,8 +381,6 @@ class ElfProduct(BinaryProduct):
         if Elf_Info.Header.ELF_SHOff != 0:
             Elf_Info.GetSectionList(Whole_Data[Elf_Info.Header.ELF_SHOff:])
             Elf_Info.FindUPLDSection(Whole_Data)
-        if (Elf_Info.UpldInfoSection.SH_Offset - Elf_Info.Header.ELF_Entry) % 4 == 0:
-            Elf_Info.Upld_Info_Align = True
         Elf_Tree = BIOSTREE(Elf_Info.Name)
         Elf_Tree.type = ELF_TREE
         Elf_Info.Data = Whole_Data[Elf_Info.HeaderLength:]

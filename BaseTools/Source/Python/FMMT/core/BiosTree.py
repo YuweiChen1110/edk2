@@ -126,20 +126,23 @@ class BIOSTREE:
         elif TargetDict[Key]["Type"] == ELF_TREE:
             ProducerId = ""
             ImageId = ""
-            Identifier = TargetDict.get(Key).get('Identifier')
-            for item in TargetDict.get(Key).get('ProducerId'):
-                ProducerId += chr(item)
-            for item in TargetDict.get(Key).get('ImageId'):
-                ImageId += chr(item)
-            Info.append("- UNIVERSAL_PAYLOAD_INFO")
-            Info.append("  - 4 bytes align: {}".format(TargetDict.get(Key).get('Upld_Info_Align')))
-            Info.append("    - Identifier: {}  # 0x48444c50--PLDH".format(hex(Identifier)))
-            Info.append("    - SpecRevision: {}".format(TargetDict.get(Key).get('SpecRevision')))
-            Info.append("    - Attribute: {}".format(TargetDict.get(Key).get('Attribute')))
-            Info.append("    - Capability: {}".format(TargetDict.get(Key).get('Capability')))
-            Info.append("    - ProducerId: {}".format(ProducerId))
-            Info.append("    - ImageId: {}".format(ImageId))
-            Info.append("\n")
+            if TargetDict.get(Key).get('IfExist'):
+                Identifier = TargetDict.get(Key).get('Identifier')
+                for item in TargetDict.get(Key).get('ProducerId'):
+                    ProducerId += chr(item)
+                for item in TargetDict.get(Key).get('ImageId'):
+                    ImageId += chr(item)
+                Info.append("- UNIVERSAL_PAYLOAD_INFO")
+                Info.append("  - 4 bytes align: {}".format(TargetDict.get(Key).get('Upld_Info_Align')))
+                Info.append("    - Identifier: {}  # 0x48444c50--PLDH / 0x444c5055--UPLD".format(hex(Identifier)))
+                Info.append("    - SpecRevision: {}".format(TargetDict.get(Key).get('SpecRevision')))
+                Info.append("    - Attribute: {}".format(TargetDict.get(Key).get('Attribute')))
+                Info.append("    - Capability: {}".format(TargetDict.get(Key).get('Capability')))
+                Info.append("    - ProducerId: {}".format(ProducerId))
+                Info.append("    - ImageId: {}".format(ImageId))
+                Info.append("\n")
+            else:
+                print("Do not find the Upld Info section!!!\n")
         elif TargetDict[Key]["Type"] in FvType:
             space += 2
             if TargetDict[Key]["Type"] == SEC_FV_TREE:
@@ -179,13 +182,15 @@ class BIOSTREE:
             TreeInfo[key] = collections.OrderedDict()
             TreeInfo[key]["Name"] = key
             TreeInfo[key]["Type"] = self.type
-            TreeInfo[key]["Identifier"] = self.Data.UpldInfo.Identifier
-            TreeInfo[key]["SpecRevision"] = self.Data.UpldInfo.SpecRevision
-            TreeInfo[key]["Attribute"] = self.Data.UpldInfo.Attribute
-            TreeInfo[key]["Capability"] = self.Data.UpldInfo.Capability
-            TreeInfo[key]["ProducerId"] = self.Data.UpldInfo.ProducerId
-            TreeInfo[key]["ImageId"] = self.Data.UpldInfo.ImageId
-            TreeInfo[key]["Upld_Info_Align"] = self.Data.Upld_Info_Align
+            TreeInfo[key]["IfExist"] = self.Data.UpldInfo
+            if self.Data.UpldInfo:
+                TreeInfo[key]["Identifier"] = self.Data.UpldInfo.Identifier
+                TreeInfo[key]["SpecRevision"] = self.Data.UpldInfo.SpecRevision
+                TreeInfo[key]["Attribute"] = self.Data.UpldInfo.Attribute
+                TreeInfo[key]["Capability"] = self.Data.UpldInfo.Capability
+                TreeInfo[key]["ProducerId"] = self.Data.UpldInfo.ProducerId
+                TreeInfo[key]["ImageId"] = self.Data.UpldInfo.ImageId
+                TreeInfo[key]["Upld_Info_Align"] = self.Data.Upld_Info_Align
         elif self.type == FV_TREE or  self.type == SEC_FV_TREE:
             key = str(self.Data.FvId)
             TreeInfo[key] = collections.OrderedDict()
