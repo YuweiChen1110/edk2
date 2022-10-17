@@ -135,9 +135,10 @@ class BIOSTREE:
                 Info.append("- UNIVERSAL_PAYLOAD_INFO")
                 Info.append("  - 4 bytes align: {}".format(TargetDict.get(Key).get('Upld_Info_Align')))
                 Info.append("    - Identifier: {}  # 0x48444c50--PLDH / 0x444c5055--UPLD".format(hex(Identifier)))
-                Info.append("    - SpecRevision: {}".format(TargetDict.get(Key).get('SpecRevision')))
-                Info.append("    - Attribute: {}".format(TargetDict.get(Key).get('Attribute')))
-                Info.append("    - Capability: {}".format(TargetDict.get(Key).get('Capability')))
+                Info.append("    - SpecRevision: {}".format(hex(TargetDict.get(Key).get('SpecRevision'))))
+                Info.append("    - Attribute: {}".format(hex(TargetDict.get(Key).get('Attribute'))))
+                Info.append("    - Revision: {}".format(hex(TargetDict.get(Key).get('Revision'))))
+                Info.append("    - Capability: {}".format(hex(TargetDict.get(Key).get('Capability'))))
                 Info.append("    - ProducerId: {}".format(ProducerId))
                 Info.append("    - ImageId: {}".format(ImageId))
                 Info.append("\n")
@@ -187,6 +188,7 @@ class BIOSTREE:
                 TreeInfo[key]["Identifier"] = self.Data.UpldInfo.Identifier
                 TreeInfo[key]["SpecRevision"] = self.Data.UpldInfo.SpecRevision
                 TreeInfo[key]["Attribute"] = self.Data.UpldInfo.Attribute
+                TreeInfo[key]["Revision"] = self.Data.UpldInfo.Revision
                 TreeInfo[key]["Capability"] = self.Data.UpldInfo.Capability
                 TreeInfo[key]["ProducerId"] = self.Data.UpldInfo.ProducerId
                 TreeInfo[key]["ImageId"] = self.Data.UpldInfo.ImageId
