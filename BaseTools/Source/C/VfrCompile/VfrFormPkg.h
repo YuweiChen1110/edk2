@@ -14,6 +14,8 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 #include "EfiVfr.h"
 #include "VfrError.h"
 #include "VfrUtilityLib.h"
+#include "VfrOpCode.h"
+#include "Common/UefiInternalFormRepresentation.h"
 
 #define NO_QST_REFED "no question refered"
 
@@ -377,6 +379,13 @@ public:
   VOID SetHelp (IN EFI_STRING_ID Help) {
     mHeader->Help = Help;
   }
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->StatementHeader.Help = mHeader->Help;
+    NewNode->StatementHeader.Prompt = mHeader->Prompt;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 /*
@@ -476,6 +485,17 @@ public:
 
   VOID UpdateCIfrQuestionHeader (IN EFI_IFR_QUESTION_HEADER *Header) {
     mHeader = Header;
+  }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->QuestionHeader.QuestionId = mHeader->QuestionId;
+    NewNode->QuestionHeader.VarStoreId = mHeader->VarStoreId;
+    NewNode->QuestionHeader.VarStoreInfo.VarName = mHeader->VarStoreInfo.VarName;
+    NewNode->QuestionHeader.VarStoreInfo.VarOffset = mHeader->VarStoreInfo.VarOffset;
+    NewNode->QuestionHeader.Flags = mHeader->Flags;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -657,6 +677,7 @@ class CIfrFormSet : public CIfrObj, public CIfrOpHeader {
 private:
   EFI_IFR_FORM_SET *mFormSet;
   EFI_GUID *mClassGuid;
+  UINT8    mClassGuidNum;
 
 public:
   CIfrFormSet (UINT8 Size) : CIfrObj (EFI_IFR_FORM_SET_OP, (CHAR8 **)NULL, Size),
@@ -666,6 +687,7 @@ public:
     mFormSet->Flags        = 0;
     memset (&mFormSet->Guid, 0, sizeof (EFI_GUID));
     mClassGuid = (EFI_GUID *) (mFormSet + 1);
+    mClassGuidNum = 0;
   }
 
   VOID SetGuid (IN EFI_GUID *Guid) {
@@ -681,11 +703,25 @@ public:
   }
 
   VOID SetClassGuid (IN EFI_GUID *Guid) {
+    mClassGuidNum ++;
     memmove (&(mClassGuid[mFormSet->Flags++]), Guid, sizeof (EFI_GUID));
   }
 
   UINT8 GetFlags() {
     return mFormSet->Flags;
+  }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mFormSet->Header;
+    NewNode->Help = mFormSet->Help;
+    NewNode->FormSetTitle = mFormSet->FormSetTitle;
+    NewNode->Flags = mFormSet->Flags;
+    NewNode->Guid = mFormSet->Guid;
+    NewNode->ClassGuid = mClassGuid;
+    NewNode->ClassGuidNum = mClassGuidNum;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -712,6 +748,15 @@ public:
 
   VOID SetDefaultId (IN UINT16 DefaultId) {
     mDefaultStore->DefaultId = DefaultId;
+  }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mDefaultStore->Header;
+    NewNode->DefaultId = mDefaultStore->DefaultId;
+    NewNode->DefaultName = mDefaultStore->DefaultName;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -766,6 +811,15 @@ public:
   VOID SetFormTitle (IN EFI_STRING_ID FormTitle) {
     mForm->FormTitle = FormTitle;
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mForm->Header;
+    NewNode->FormId = mForm->FormId;
+    NewNode->FormTitle = mForm->FormTitle;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrFormMap : public CIfrObj, public CIfrOpHeader {
@@ -803,6 +857,14 @@ public:
       memmove (&(mMethodMap->MethodIdentifier), MethodGuid, sizeof (EFI_GUID));
       mMethodMap ++;
     }
+  }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mFormMap->Header;
+    NewNode->FormId = mFormMap->FormId;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -843,6 +905,17 @@ public:
         }
       }
     }
+  }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mVarStore->Header;
+    NewNode->VarStoreId = mVarStore->VarStoreId;
+    NewNode->Size = mVarStore->Size;
+    NewNode->Guid = mVarStore->Guid;
+    strcpy ((CHAR8 *)(NewNode->Name), (CHAR8 *)(mVarStore->Name));
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -900,6 +973,17 @@ public:
       DecLength(Len - Size);
     }
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mVarStoreEfi->Header;
+    NewNode->VarStoreId = mVarStoreEfi->VarStoreId;
+    NewNode->Size = mVarStoreEfi->Size;
+    NewNode->Guid = mVarStoreEfi->Guid;
+    strcpy ((CHAR8 *)(NewNode->Name), (CHAR8 *)(mVarStoreEfi->Name));
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrVarStoreNameValue : public CIfrObj, public CIfrOpHeader {
@@ -920,6 +1004,15 @@ public:
   VOID SetVarStoreId (IN UINT16 VarStoreId) {
     mVarStoreNameValue->VarStoreId = VarStoreId;
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mVarStoreNameValue->Header;
+    NewNode->VarStoreId = mVarStoreNameValue->VarStoreId;
+    NewNode->Guid = mVarStoreNameValue->Guid;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrImage : public CIfrObj, public CIfrOpHeader {
@@ -934,6 +1027,14 @@ public:
 
   VOID SetImageId (IN EFI_IMAGE_ID ImageId) {
     mImage->Id = ImageId;
+  }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mImage->Header;
+    NewNode->Id = mImage->Id;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -963,6 +1064,14 @@ public:
 
   VOID SetRuleId (IN UINT8 RuleId) {
     mRule->RuleId = RuleId;
+  }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mRule->Header;
+    NewNode->RuleId = mRule->RuleId;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -996,6 +1105,16 @@ public:
   VOID SetValue (IN EFI_IFR_TYPE_VALUE Value) {
     memmove (&mDefault->Value, &Value, mDefault->Header.Length - OFFSET_OF (EFI_IFR_DEFAULT, Value));
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mDefault->Header;
+    NewNode->Type = mDefault->Type;
+    NewNode->DefaultId = mDefault->DefaultId;
+    NewNode->Value = mDefault->Value;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrDefault2 : public CIfrObj, public CIfrOpHeader {
@@ -1018,6 +1137,15 @@ public:
 
   VOID SetType (IN UINT8 Type) {
     mDefault->Type = Type;
+  }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mDefault->Header;
+    NewNode->Type = mDefault->Type;
+    NewNode->DefaultId = mDefault->DefaultId;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -1060,6 +1188,17 @@ public:
     mGet->VarStoreInfo.VarOffset = Info->mInfo.mVarOffset;
     mGet->VarStoreType           = Info->mVarType;
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mGet->Header;
+    NewNode->VarStoreId = mGet->VarStoreId;
+    NewNode->VarStoreInfo.VarName = mGet->VarStoreInfo.VarName;
+    NewNode->VarStoreInfo.VarOffset = mGet->VarStoreInfo.VarOffset;
+    NewNode->VarStoreId = mGet->VarStoreType;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrSet : public CIfrObj, public CIfrOpHeader{
@@ -1079,6 +1218,17 @@ public:
     mSet->VarStoreInfo.VarName   = Info->mInfo.mVarName;
     mSet->VarStoreInfo.VarOffset = Info->mInfo.mVarOffset;
     mSet->VarStoreType           = Info->mVarType;
+  }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mSet->Header;
+    NewNode->VarStoreId = mSet->VarStoreId;
+    NewNode->VarStoreInfo.VarName = mSet->VarStoreInfo.VarName;
+    NewNode->VarStoreInfo.VarOffset = mSet->VarStoreInfo.VarOffset;
+    NewNode->VarStoreId = mSet->VarStoreType;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -1100,6 +1250,15 @@ public:
 
     return _FLAGS_ZERO (LFlags) ? VFR_RETURN_SUCCESS : VFR_RETURN_FLAGS_UNSUPPORTED;
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mSubtitle->Header;
+    NewNode->StatementHeader = mSubtitle->Statement;
+    NewNode->Flags = mSubtitle->Flags;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrText : public CIfrObj, public CIfrOpHeader, public CIfrStatementHeader {
@@ -1116,6 +1275,15 @@ public:
   VOID SetTextTwo (IN EFI_STRING_ID StringId) {
     mText->TextTwo = StringId;
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mText->Header;
+    NewNode->StatementHeader = mText->Statement;
+    NewNode->TextTwo = mText->TextTwo;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrRef : public CIfrObj, public CIfrOpHeader, public CIfrQuestionHeader {
@@ -1131,6 +1299,15 @@ public:
 
   VOID SetFormId (IN EFI_FORM_ID FormId) {
     mRef->FormId = FormId;
+  }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mRef->Header;
+    NewNode->QuestionHeader = mRef->Question;
+    NewNode->FormId = mRef->FormId;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -1152,6 +1329,16 @@ public:
 
   VOID SetQuestionId (IN EFI_QUESTION_ID QuestionId) {
     mRef2->QuestionId = QuestionId;
+  }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mRef2->Header;
+    NewNode->QuestionHeader = mRef2->Question;
+    NewNode->FormId = mRef2->FormId;
+    NewNode->QuestionId = mRef2->QuestionId;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -1178,6 +1365,17 @@ public:
 
   VOID SetFormSetId (IN EFI_GUID FormSetId) {
     mRef3->FormSetId = FormSetId;
+  }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mRef3->Header;
+    NewNode->QuestionHeader = mRef3->Question;
+    NewNode->FormId = mRef3->FormId;
+    NewNode->QuestionId = mRef3->QuestionId;
+    NewNode->FormSetId = mRef3->FormSetId;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -1210,13 +1408,35 @@ public:
   VOID SetDevicePath (IN EFI_STRING_ID DevicePath) {
     mRef4->DevicePath = DevicePath;
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mRef4->Header;
+    NewNode->QuestionHeader = mRef4->Question;
+    NewNode->FormId = mRef4->FormId;
+    NewNode->QuestionId = mRef4->QuestionId;
+    NewNode->FormSetId = mRef4->FormSetId;
+    NewNode->DevicePath = mRef4->DevicePath;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrRef5 : public CIfrObj, public CIfrOpHeader, public CIfrQuestionHeader {
+private:
+  EFI_IFR_REF5 *mRef5;
+
 public:
   CIfrRef5 () : CIfrObj (EFI_IFR_REF_OP, (CHAR8 **)NULL, sizeof (EFI_IFR_REF5)),
               CIfrOpHeader (EFI_IFR_REF_OP, &(GetObjBinAddr<EFI_IFR_REF5>())->Header, sizeof (EFI_IFR_REF5)),
-              CIfrQuestionHeader (&(GetObjBinAddr<EFI_IFR_REF5>())->Question) {
+              CIfrQuestionHeader (&(GetObjBinAddr<EFI_IFR_REF5>())->Question), mRef5(GetObjBinAddr<EFI_IFR_REF5>()) {
+  }
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mRef5->Header;
+    NewNode->QuestionHeader = mRef5->Question;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -1233,6 +1453,15 @@ public:
 
   VOID SetDefaultId (IN UINT16 DefaultId) {
     mResetButton->DefaultId = DefaultId;
+  }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mResetButton->Header;
+    NewNode->StatementHeader = mResetButton->Statement;
+    NewNode->DefaultId = mResetButton->DefaultId;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -1274,6 +1503,15 @@ public:
   UINT8 GetFlags (VOID) {
     return mCheckBox->Flags;
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mCheckBox->Header;
+    NewNode->QuestionHeader = mCheckBox->Question;
+    NewNode->Flags = mCheckBox->Flags;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrAction : public CIfrObj, public CIfrOpHeader, public CIfrQuestionHeader {
@@ -1289,6 +1527,15 @@ public:
 
   VOID SetQuestionConfig (IN EFI_STRING_ID QuestionConfig) {
     mAction->QuestionConfig = QuestionConfig;
+  }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mAction->Header;
+    NewNode->QuestionHeader = mAction->Question;
+    NewNode->QuestionConfig = mAction->QuestionConfig;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -1332,6 +1579,15 @@ public:
     }
 
     return _FLAGS_ZERO (LFlags) ? VFR_RETURN_SUCCESS : VFR_RETURN_FLAGS_UNSUPPORTED;
+  }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mDate->Header;
+    NewNode->QuestionHeader = mDate->Question;
+    NewNode->Flags = mDate->Flags;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -1410,6 +1666,16 @@ public:
   UINT8 GetNumericFlags () {
     return mNumeric->Flags;
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mNumeric->Header;
+    NewNode->QuestionHeader = mNumeric->Question;
+    NewNode->Flags = mNumeric->Flags;
+    NewNode->data = mNumeric->data;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrOneOf : public CIfrObj, public CIfrOpHeader, public CIfrQuestionHeader, public CIfrMinMaxStepData {
@@ -1483,6 +1749,17 @@ public:
     UpdateCIfrQuestionHeader(&mOneOf->Question);
     UpdateCIfrMinMaxStepData(&mOneOf->data);
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mOneOf->Header;
+    NewNode->QuestionHeader = mOneOf->Question;
+    NewNode->Flags = mOneOf->Flags;
+    NewNode->data = mOneOf->data;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+    // gCOpCodeDB.AddNewOpOneOfNode(NewNode);
+  }
 };
 
 class CIfrString : public CIfrObj, public CIfrOpHeader, public CIfrQuestionHeader {
@@ -1525,6 +1802,17 @@ public:
   VOID SetMaxSize (IN UINT8 MaxSize) {
     mString->MaxSize = MaxSize;
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mString->Header;
+    NewNode->QuestionHeader = mString->Question;
+    NewNode->Flags = mString->Flags;
+    NewNode->StringMinSize = mString->MinSize;
+    NewNode->StringMaxSize = mString->MaxSize;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrPassword : public CIfrObj, public CIfrOpHeader, public CIfrQuestionHeader {
@@ -1550,6 +1838,16 @@ public:
 
   VOID SetMaxSize (IN UINT16 MaxSize) {
     mPassword->MaxSize = MaxSize;
+  }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mPassword->Header;
+    NewNode->QuestionHeader = mPassword->Question;
+    NewNode->PasswordMinSize = mPassword->MinSize;
+    NewNode->PasswordMaxSize = mPassword->MaxSize;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -1591,6 +1889,16 @@ public:
     }
 
     return _FLAGS_ZERO (LFlags) ? VFR_RETURN_SUCCESS : VFR_RETURN_FLAGS_UNSUPPORTED;
+  }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mOrderedList->Header;
+    NewNode->QuestionHeader = mOrderedList->Question;
+    NewNode->MaxContainers = mOrderedList->MaxContainers;
+    NewNode->Flags = mOrderedList->Flags;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -1635,6 +1943,15 @@ public:
 
     return _FLAGS_ZERO (LFlags) ? VFR_RETURN_SUCCESS : VFR_RETURN_FLAGS_UNSUPPORTED;
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mTime->Header;
+    NewNode->QuestionHeader = mTime->Question;
+    NewNode->Flags = mTime->Flags;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrDisableIf : public CIfrObj, public CIfrOpHeader {
@@ -1644,9 +1961,36 @@ public:
 };
 
 class CIfrSuppressIf : public CIfrObj, public CIfrOpHeader {
+private:
+  EFI_IFR_SUPPRESS_IF *mSuppressIf;
+
 public:
   CIfrSuppressIf () : CIfrObj (EFI_IFR_SUPPRESS_IF_OP),
-                     CIfrOpHeader (EFI_IFR_SUPPRESS_IF_OP, &(GetObjBinAddr<EFI_IFR_SUPPRESS_IF>())->Header) {}
+                     CIfrOpHeader (EFI_IFR_SUPPRESS_IF_OP, &(GetObjBinAddr<EFI_IFR_SUPPRESS_IF>())->Header), mSuppressIf(GetObjBinAddr<EFI_IFR_SUPPRESS_IF>()) {
+    mSuppressIf->Condition[0] = '\0';
+  }
+
+  VOID SetCondition (IN CHAR8 *Condition) {
+    UINT8 Len;
+    printf("TestTest1: %s\n", Condition);
+    if (Condition != NULL) {
+      Len = (UINT8) strlen (Condition);
+      printf("Length: %d\n", Len);
+      if (Len != 0) {
+          strcpy ((CHAR8 *)(mSuppressIf->Condition), Condition);
+          printf("TestTest2: %s\n", Condition);
+          printf("TestTest3: %s\n", mSuppressIf->Condition);
+      }
+    }
+  }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mSuppressIf->Header;
+    strcpy ((CHAR8 *)(NewNode->Condition), (CHAR8 *)(mSuppressIf->Condition));
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrGrayOutIf : public CIfrObj, public CIfrOpHeader {
@@ -1668,6 +2012,14 @@ public:
   VOID SetError (IN EFI_STRING_ID Error) {
     mInconsistentIf->Error = Error;
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mInconsistentIf->Header;
+    NewNode->Error = mInconsistentIf->Error;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrWarningIf : public CIfrObj, public CIfrOpHeader {
@@ -1688,6 +2040,15 @@ public:
   VOID SetTimeOut (IN UINT8 TimeOut) {
     mWarningIf->TimeOut = TimeOut;
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mWarningIf->Header;
+    NewNode->Warning = mWarningIf->Warning;
+    NewNode->TimeOut = mWarningIf->TimeOut;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrNoSubmitIf : public CIfrObj, public CIfrOpHeader {
@@ -1702,6 +2063,14 @@ public:
 
   VOID SetError (IN EFI_STRING_ID Error) {
     mNoSubmitIf->Error = Error;
+  }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mNoSubmitIf->Header;
+    NewNode->Error = mNoSubmitIf->Error;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -1718,6 +2087,14 @@ public:
   VOID SetRefreshInterval (IN UINT8 RefreshInterval) {
     mRefresh->RefreshInterval = RefreshInterval;
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mRefresh->Header;
+    NewNode->RefreshInterval = mRefresh->RefreshInterval;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrRefreshId : public CIfrObj, public CIfrOpHeader {
@@ -1733,6 +2110,14 @@ public:
   VOID SetRefreshEventGroutId (IN EFI_GUID *RefreshEventGroupId) {
     memmove (&mRefreshId->RefreshEventGroupId, RefreshEventGroupId, sizeof (EFI_GUID));
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mRefreshId->Header;
+    NewNode->RefreshEventGroupId = mRefreshId->RefreshEventGroupId;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrVarStoreDevice : public CIfrObj, public CIfrOpHeader {
@@ -1747,6 +2132,14 @@ public:
 
   VOID SetDevicePath (IN EFI_STRING_ID DevicePath) {
     mVarStoreDevice->DevicePath = DevicePath;
+  }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mVarStoreDevice->Header;
+    NewNode->DevicePath = mVarStoreDevice->DevicePath;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -1820,6 +2213,18 @@ public:
   UINT8 GetFlags (VOID) {
     return mOneOfOption->Flags;
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mOneOfOption->Header;
+    NewNode->Option = mOneOfOption->Option;
+    NewNode->Flags = mOneOfOption->Flags;
+    NewNode->Type = mOneOfOption->Type;
+    NewNode->Value = mOneOfOption->Value;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+    gCOpCodeDB.AddNewOpOneOfNode(NewNode);
+  }
 };
 
 static EFI_GUID IfrTianoGuid     = EFI_IFR_TIANO_GUID;
@@ -1840,6 +2245,15 @@ public:
   VOID SetClass (IN UINT16 Class) {
     mClass->Class        = Class;
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->ExtendOpCode = mClass->ExtendOpCode;
+    NewNode->Guid = mClass->Guid;
+    NewNode->Class = mClass->Class;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrSubClass : public CIfrObj, public CIfrOpHeader {
@@ -1857,6 +2271,16 @@ public:
   VOID SetSubClass (IN UINT16 SubClass) {
     mSubClass->SubClass = SubClass;
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mSubClass->Header;
+    NewNode->ExtendOpCode = mSubClass->ExtendOpCode;
+    NewNode->Guid = mSubClass->Guid;
+    NewNode->SubClass = mSubClass->SubClass;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrLabel : public CIfrObj, public CIfrOpHeader {
@@ -1872,6 +2296,16 @@ public:
 
   VOID SetNumber (IN UINT16 Number) {
     mLabel->Number = Number;
+  }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mLabel->Header;
+    NewNode->ExtendOpCode = mLabel->ExtendOpCode;
+    NewNode->LabelNumber = mLabel->Number;
+    NewNode->Guid = mLabel->Guid;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -1897,6 +2331,18 @@ public:
   VOID SetAlign (IN UINT8 Align) {
     mBanner->Alignment = Align;
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mBanner->Header;
+    NewNode->ExtendOpCode = mBanner->ExtendOpCode;
+    NewNode->Guid = mBanner->Guid;
+    NewNode->Title = mBanner->Title;
+    NewNode->LineNumber = mBanner->LineNumber;
+    NewNode->Alignment = mBanner->Alignment;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrOptionKey : public CIfrObj, public CIfrOpHeader {
@@ -1916,6 +2362,18 @@ public:
     mOptionKey->OptionValue  = OptionValue;
     mOptionKey->KeyValue     = KeyValue;
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mOptionKey->Header;
+    NewNode->ExtendOpCode = mOptionKey->ExtendOpCode;
+    NewNode->Guid = mOptionKey->Guid;
+    NewNode->QuestionId = mOptionKey->QuestionId;
+    NewNode->OptionValue = mOptionKey->OptionValue;
+    NewNode->KeyValue = mOptionKey->KeyValue;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrVarEqName : public CIfrObj, public CIfrOpHeader {
@@ -1933,6 +2391,17 @@ public:
     mVarEqName->QuestionId   = QuestionId;
     mVarEqName->NameId       = NameId;
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mVarEqName->Header;
+    NewNode->ExtendOpCode = mVarEqName->ExtendOpCode;
+    NewNode->Guid = mVarEqName->Guid;
+    NewNode->QuestionId = mVarEqName->QuestionId;
+    NewNode->NameId = mVarEqName->NameId;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrTimeout : public CIfrObj, public CIfrOpHeader {
@@ -1949,6 +2418,16 @@ public:
 
   VOID SetTimeout (IN UINT16 Timeout) {
     mTimeout->TimeOut = Timeout;
+  }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mTimeout->Header;
+    NewNode->ExtendOpCode = mTimeout->ExtendOpCode;
+    NewNode->Guid = mTimeout->Guid;
+    NewNode->TimeOut = mTimeout->TimeOut;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -1968,6 +2447,14 @@ public:
 
   VOID SetData (IN UINT8* DataBuff, IN UINT8 Size) {
     memmove ((UINT8 *)mGuid + sizeof (EFI_IFR_GUID), DataBuff, Size);
+  }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mGuid->Header;
+    NewNode->Guid = mGuid->Guid;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -2018,6 +2505,15 @@ public:
       gCFormPkg.AssignPending (VarIdStr, (VOID *)(&mEqIdId->QuestionId2), sizeof (EFI_QUESTION_ID), LineNo, NO_QST_REFED);
     }
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mEqIdId->Header;
+    NewNode->QuestionId1 = mEqIdId->QuestionId1;
+    NewNode->QuestionId2 = mEqIdId->QuestionId2;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrEqIdVal : public CIfrObj, public CIfrOpHeader {
@@ -2047,6 +2543,15 @@ public:
 
   VOID SetValue (IN UINT16 Value) {
     mEqIdVal->Value = Value;
+  }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mEqIdVal->Header;
+    NewNode->QuestionId = mEqIdVal->QuestionId;
+    NewNode->mEqIdVal_Value = mEqIdVal->Value;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -2099,6 +2604,16 @@ public:
       mEqIdVList->ValueList[Index] = Value;
     }
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mEqIdVList->Header;
+    NewNode->QuestionId = mEqIdVList->QuestionId;
+    NewNode->ListLength = mEqIdVList->ListLength;
+    NewNode->ValueList[0] = mEqIdVList->ValueList[0];
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrQuestionRef1 : public CIfrObj, public CIfrOpHeader {
@@ -2124,6 +2639,13 @@ public:
     } else {
       gCFormPkg.AssignPending (VarIdStr, (VOID *)(&mQuestionRef1->QuestionId), sizeof (EFI_QUESTION_ID), LineNo, NO_QST_REFED);
     }
+  }
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mQuestionRef1->Header;
+    NewNode->QuestionId = mQuestionRef1->QuestionId;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -2163,6 +2685,14 @@ public:
   VOID SetDevicePath (IN EFI_STRING_ID DevicePath) {
     mQuestionRef3_2->DevicePath = DevicePath;
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mQuestionRef3_2->Header;
+    NewNode->DevicePath = mQuestionRef3_2->DevicePath;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrQuestionRef3_3 : public CIfrObj, public CIfrOpHeader {
@@ -2186,6 +2716,15 @@ public:
   VOID SetGuid (IN EFI_GUID *Guid) {
     mQuestionRef3_3->Guid = *Guid;
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mQuestionRef3_3->Header;
+    NewNode->DevicePath = mQuestionRef3_3->DevicePath;
+    NewNode->Guid = mQuestionRef3_3->Guid;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrRuleRef : public CIfrObj, public CIfrOpHeader {
@@ -2204,6 +2743,14 @@ public:
   VOID SetRuleId (IN UINT8 RuleId) {
     mRuleRef->RuleId = RuleId;
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mRuleRef->Header;
+    NewNode->RuleId = mRuleRef->RuleId;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrStringRef1 : public CIfrObj, public CIfrOpHeader {
@@ -2221,6 +2768,13 @@ public:
 
   VOID SetStringId (IN EFI_STRING_ID StringId) {
     mStringRef1->StringId = StringId;
+  }
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mStringRef1->Header;
+    NewNode->StringId = mStringRef1->StringId;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -2260,6 +2814,14 @@ public:
   VOID SetPermissions (IN EFI_GUID *Permissions) {
     memmove (&mSecurity->Permissions, Permissions, sizeof (EFI_GUID));
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mSecurity->Header;
+    NewNode->Permissions = mSecurity->Permissions;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrUint8 : public CIfrObj, public CIfrOpHeader {
@@ -2276,6 +2838,14 @@ public:
 
   VOID SetValue (IN UINT8 Value) {
     mUint8->Value = Value;
+  }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mUint8->Header;
+    NewNode->Value.u8 = mUint8->Value;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -2294,6 +2864,14 @@ public:
   VOID SetValue (IN UINT16 Value) {
     mUint16->Value = Value;
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mUint16->Header;
+    NewNode->Value.u16 = mUint16->Value;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrUint32 : public CIfrObj, public CIfrOpHeader {
@@ -2311,6 +2889,14 @@ public:
   VOID SetValue (IN UINT32 Value) {
     mUint32->Value = Value;
   }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mUint32->Header;
+    NewNode->Value.u32 = mUint32->Value;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
+  }
 };
 
 class CIfrUint64 : public CIfrObj, public CIfrOpHeader {
@@ -2327,6 +2913,14 @@ public:
 
   VOID SetValue (IN UINT64 Value) {
     mUint64->Value = Value;
+  }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mUint64->Header;
+    NewNode->Value.u64 = mUint64->Value;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -2454,6 +3048,14 @@ public:
 
   VOID SetFormat (IN UINT8 Format) {
     mToString->Format = Format;
+  }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mToString->Header;
+    NewNode->Format = mToString->Format;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 
@@ -2770,6 +3372,14 @@ public:
     }
 
     return _FLAGS_ZERO (LFlags) ? VFR_RETURN_SUCCESS : VFR_RETURN_FLAGS_UNSUPPORTED;
+  }
+
+  VOID CollectNodeInfo () {
+    SOpNode *NewNode = new SOpNode;
+    NewNode->Header = mSpan->Header;
+    NewNode->Flags = mSpan->Flags;
+    NewNode->mNext = NULL;
+    gCOpCodeDB.AddNewOpNode(NewNode);
   }
 };
 

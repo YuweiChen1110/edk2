@@ -1011,6 +1011,7 @@ typedef struct _EFI_IFR_DISABLE_IF {
 
 typedef struct _EFI_IFR_SUPPRESS_IF {
   EFI_IFR_OP_HEADER        Header;
+  UINT8                    Condition[1];
 } EFI_IFR_SUPPRESS_IF;
 
 typedef struct _EFI_IFR_GRAY_OUT_IF {
@@ -1300,6 +1301,7 @@ typedef struct _EFI_IFR_NOT_EQUAL {
 
 typedef struct _EFI_IFR_OR {
   EFI_IFR_OP_HEADER        Header;
+  UINT8                    Condition[1];
 } EFI_IFR_OR;
 
 typedef struct _EFI_IFR_SHIFT_LEFT {

@@ -89,6 +89,7 @@ public:
   virtual UINT8   Select (IN CHAR8 *, IN EFI_GUID *, IN CHAR8 *Info = NULL);
   virtual UINT8   Write (IN CONST CHAR8, IN CHAR8 *, IN EFI_GUID *, IN CHAR8 *, IN UINT8, IN UINT16, IN UINT32, IN EFI_IFR_TYPE_VALUE);
   virtual VOID    DumpJson(IN FILE *);
+  virtual VOID    DumpYaml(IN FILE *);
 #if 0
   virtual UINT8   Read (OUT CHAR8 **, OUT CHAR8 **, OUT CHAR8 **, OUT CHAR8 **, OUT CHAR8 **);
 #endif

@@ -17,6 +17,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 PACKAGE_DATA  gCBuffer;
 PACKAGE_DATA  gRBuffer;
 CVfrStringDB  gCVfrStringDB;
+COpCodeDB     gCOpCodeDB;
 
 VOID
 CVfrCompiler::DebugError (
@@ -79,6 +80,7 @@ CVfrCompiler::OptionInitialization (
   mOptions.AutoDefault                   = FALSE;
   mOptions.CheckDefault                  = FALSE;
   mOptions.GenJson                       = FALSE;
+  mOptions.GenYaml                       = FALSE;
   memset (&mOptions.OverrideClassGuid, 0, sizeof (EFI_GUID));
 
   if (Argc == 1) {
@@ -98,6 +100,7 @@ CVfrCompiler::OptionInitialization (
       return;
     } else if (stricmp(Argv[Index], "--variable") == 0) {
       mOptions.GenJson = TRUE;
+      mOptions.GenYaml = TRUE;
     } else if (stricmp(Argv[Index], "-l") == 0) {
       mOptions.CreateRecordListFile = TRUE;
       gCIfrRecordInfoDB.TurnOn ();
@@ -209,6 +212,9 @@ CVfrCompiler::OptionInitialization (
     goto Fail;
   }
   if (SetRecordListJsonFileName () != 0) {
+    goto Fail;
+  }
+  if (SetRecordYamlFileName () != 0) {
     goto Fail;
   }
   return;
@@ -492,6 +498,35 @@ CVfrCompiler::SetRecordListJsonFileName (
   strcpy (mOptions.RecordListJsonFile, mOptions.OutputDirectory);
   strcat (mOptions.RecordListJsonFile, mOptions.VfrBaseFileName);
   strcat (mOptions.RecordListJsonFile, VFR_RECORDLIST_JSON_FILENAME_EXTENSION);
+
+
+  return 0;
+}
+
+INT8
+CVfrCompiler::SetRecordYamlFileName (
+  VOID
+  )
+{
+  INTN Length;
+
+  if (mOptions.VfrBaseFileName == NULL) {
+    return -1;
+  }
+
+  Length = strlen (mOptions.OutputDirectory) +
+           strlen (mOptions.VfrBaseFileName) +
+           strlen (VFR_RECORD_YAML_FILENAME_EXTENSION) +
+           1;
+
+  mOptions.RecordYamlFile = (CHAR8 *) malloc (Length);
+  if (mOptions.RecordYamlFile == NULL) {
+    return -1;
+  }
+
+  strcpy (mOptions.RecordYamlFile, mOptions.OutputDirectory);
+  strcat (mOptions.RecordYamlFile, mOptions.VfrBaseFileName);
+  strcat (mOptions.RecordYamlFile, VFR_RECORD_YAML_FILENAME_EXTENSION);
 
 
   return 0;
@@ -957,6 +992,24 @@ CVfrCompiler::GenRecordListJsonFile(
   return;
 
 }
+
+VOID
+CVfrCompiler::GenRecordYamlFile(
+  VOID
+)
+{
+  if(!mOptions.GenYaml)
+    return;
+
+  FILE   *pOutFile3   = NULL;
+  if ((pOutFile3 = fopen (LongFilePath (mOptions.RecordYamlFile), "w")) == NULL) {
+    DebugError (NULL, 0, 0001, "Error opening the record yaml list file", "%s", mOptions.RecordYamlFile);
+  }
+  gCVfrBufferConfig.DumpYaml(pOutFile3);
+  fclose (pOutFile3);
+  return;
+}
+
 int
 main (
   IN int             Argc,
@@ -975,6 +1028,7 @@ main (
   Compiler.GenCFile();
   Compiler.GenRecordListFile ();
   Compiler.GenRecordListJsonFile ();
+  Compiler.GenRecordYamlFile ();
 
   Status = Compiler.RunStatus ();
   if ((Status == STATUS_DEAD) || (Status == STATUS_FAILED)) {

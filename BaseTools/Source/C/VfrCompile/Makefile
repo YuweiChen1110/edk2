@@ -13,15 +13,15 @@ LIBS = $(LIB_PATH)\Common.lib
 
 OBJECTS = AParser.obj DLexerBase.obj ATokenBuffer.obj \
           EfiVfrParser.obj VfrLexer.obj VfrSyntax.obj \
-          VfrFormPkg.obj VfrError.obj VfrUtilityLib.obj VfrCompiler.obj
+          VfrFormPkg.obj VfrError.obj VfrUtilityLib.obj VfrCompiler.obj VfrOpCode.Obj
 
 INC = $(INC) -I $(BASE_TOOLS_PATH)\Source\C\VfrCompile\Pccts\h
 
 !INCLUDE ..\Makefiles\ms.app
 
-VfrSyntax.cpp EfiVfrParser.cpp EfiVfrParser.h VfrParser.dlg VfrTokens.h: VfrSyntax.g
-	pushd . & cd Pccts & $(MAKE) & popd
-	antlr -CC -e3 -ck 3 -k 2 -fl VfrParser.dlg -ft VfrTokens.h -o . VfrSyntax.g
+# VfrSyntax.cpp EfiVfrParser.cpp EfiVfrParser.h VfrParser.dlg VfrTokens.h: VfrSyntax.g
+# 	pushd . & cd Pccts & $(MAKE) & popd
+# 	antlr -CC -e3 -ck 3 -k 2 -fl VfrParser.dlg -ft VfrTokens.h -o . VfrSyntax.g
 #	pushd . & cd Pccts & $(MAKE) clean
 
 VfrLexer.cpp VfrLexer.h: VfrParser.dlg

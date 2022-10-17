@@ -12,6 +12,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 #include "VfrFormPkg.h"
 #include "VfrError.h"
 #include "VfrUtilityLib.h"
+#include "VfrOpCode.h"
 #include "AToken.h"
 #include "ATokPtr.h"
 >>
@@ -673,12 +674,13 @@ vfrFormSetDefinition :
                                                       FSObj->SetGuid (&Guid);
                                                       FSObj->SetFormSetTitle (_STOSID(S1->getText(), S1->getLine()));
                                                       FSObj->SetHelp (_STOSID(S2->getText(), S2->getLine()));
+                                                      FSObj->CollectNodeInfo();
                                                     >>
   {
-    FC:Class "=" classDefinition[C] ","             << {CIfrClass CObj;SET_LINE_INFO (CObj, FC); CObj.SetClass(C);} >>
+    FC:Class "=" classDefinition[C] ","             << {CIfrClass CObj;SET_LINE_INFO (CObj, FC); CObj.SetClass(C); CObj.CollectNodeInfo();} >>
   }
   {
-    FSC:Subclass "=" subclassDefinition[SC] ","     << {CIfrSubClass SCObj; SET_LINE_INFO (SCObj, FSC); SCObj.SetSubClass(SC);} >>
+    FSC:Subclass "=" subclassDefinition[SC] ","     << {CIfrSubClass SCObj; SET_LINE_INFO (SCObj, FSC); SCObj.SetSubClass(SC); SCObj.CollectNodeInfo();} >>
   }
                                                     <<
                                                        _DeclareStandardDefaultStorage (GET_LINENO (L));
@@ -987,6 +989,7 @@ vfrStatementDefaultStore :
                                                          DSObj.SetLineNo(D->getLine());
                                                          DSObj.SetDefaultName (_STOSID(S->getText(), S->getLine()));
                                                          DSObj.SetDefaultId (DefaultId);
+                                                         DSObj.CollectNodeInfo();
                                                        } else {
                                                          _PCATCH(gCVfrDefaultStore.ReRegisterDefaultStoreById (DefaultId, N->getText(), _STOSID(S->getText(), S->getLine()))), D->getLine();
                                                        }
@@ -1046,6 +1049,7 @@ vfrStatementVarStoreLinear :
                                                        _PCATCH(gCVfrVarDataTypeDB.GetDataTypeSize(TypeName, &Size), LineNum);
                                                        VSObj.SetSize ((UINT16) Size);
                                                        VSObj.SetName (SN->getText());
+                                                       VSObj.CollectNodeInfo();
                                                     >>
   ";"
   ;
@@ -1155,6 +1159,7 @@ vfrStatementVarStoreEfi :
                                                        
                                                        VSEObj.SetSize ((UINT16) Size);
                                                        VSEObj.SetName (StoreName);
+                                                       VSEObj.CollectNodeInfo();
                                                        if (IsUEFI23EfiVarstore == FALSE && StoreName != NULL) {
                                                          delete[] StoreName;
                                                        }
@@ -1199,6 +1204,7 @@ vfrStatementVarStoreNameValue :
                                                        VSNVObj.SetGuid (&Guid);
                                                        _PCATCH(gCVfrDataStorage.GetVarStoreId(SN->getText(), &VarStoreId, &Guid), SN);
                                                        VSNVObj.SetVarStoreId (VarStoreId);
+                                                       VSNVObj.CollectNodeInfo();
                                                     >>
   ";"
   ;
@@ -1692,7 +1698,8 @@ vfrFormDefinition :
   << CIfrForm FObj; >>
   F:Form                                            << FObj.SetLineNo(F->getLine()); >>
   FormId "=" S1:Number ","                          << _PCATCH(FObj.SetFormId (_STOFID(S1->getText(), S1->getLine())), S1); >>
-  Title "=" "STRING_TOKEN" "\(" S2:Number "\)" ";"  << FObj.SetFormTitle (_STOSID(S2->getText(), S2->getLine())); >>
+  Title "=" "STRING_TOKEN" "\(" S2:Number "\)" ";"  << FObj.SetFormTitle (_STOSID(S2->getText(), S2->getLine()));
+                                                       FObj.CollectNodeInfo();>>
   (
     vfrStatementImage                        |
     vfrStatementLocked                       |
@@ -1725,7 +1732,7 @@ vfrFormMapDefinition :
   FormId "=" S1:Number ","                          << _PCATCH(FMapObj->SetFormId (_STOFID(S1->getText(), S1->getLine())), S1); >>
   (
     MapTitle "=" "STRING_TOKEN" "\(" S2:Number "\)" ";"
-    MapGuid  "=" guidDefinition[Guid] ";"           << FMapObj->SetFormMapMethod (_STOFID(S2->getText(), S2->getLine()), &Guid); FormMapMethodNumber ++; >>
+    MapGuid  "=" guidDefinition[Guid] ";"           << FMapObj->SetFormMapMethod (_STOFID(S2->getText(), S2->getLine()), &Guid); FormMapMethodNumber ++; FMapObj->CollectNodeInfo();>>
   )*                                                << if (FormMapMethodNumber == 0) {_PCATCH (VFR_RETURN_INVALID_PARAMETER, F->getLine(), "No MapMethod is set for FormMap!");} delete FMapObj;>>
   (
     vfrStatementImage                        |
@@ -1751,6 +1758,7 @@ vfrStatementRules :
   S1:StringIdentifier ","                           <<
                                                        mCVfrRulesDB.RegisterRule (S1->getText());
                                                        RObj.SetRuleId (mCVfrRulesDB.GetRuleId(S1->getText()));
+                                                       RObj.CollectNodeInfo();
                                                     >>
   vfrStatementExpression[0]
   E:EndRule                                         << CRT_END_OP (E); >>
@@ -1885,6 +1893,7 @@ vfrStatementDefault :
                                                           }
                                                         }
                                                         DObj->SetValue(*Val);
+                                                        
                                                     >>
       |                                             << IsExp = TRUE; DObj2 = new CIfrDefault2; DObj2->SetLineNo(D->getLine()); DObj2->SetScope (1); >>
         vfrStatementValue ","                       << CIfrEnd EndObj1; EndObj1.SetLineNo(D->getLine()); >>
@@ -1919,8 +1928,8 @@ vfrStatementDefault :
                                                                    );
                                                          }
                                                        }
-                                                       if (DObj  != NULL) {delete DObj;} 
-                                                       if (DObj2 != NULL) {delete DObj2;} 
+                                                       if (DObj  != NULL) {DObj->CollectNodeInfo(); delete DObj;} 
+                                                       if (DObj2 != NULL) {DObj2->CollectNodeInfo(); delete DObj2;} 
                                                     >>
   )
   ;
@@ -2015,7 +2024,7 @@ vfrStatementWrite :
 vfrStatementSubTitle :
   << CIfrSubtitle SObj; >>
   L:Subtitle                                           << SObj.SetLineNo(L->getLine()); >>
-  Text "=" "STRING_TOKEN" "\(" S:Number "\)"           << SObj.SetPrompt (_STOSID(S->getText(), S->getLine())); >>
+  Text "=" "STRING_TOKEN" "\(" S:Number "\)"           << SObj.SetPrompt (_STOSID(S->getText(), S->getLine())); SObj.CollectNodeInfo();>>
   {
     "," FLAGS "=" vfrSubtitleFlags[SObj]
   }
@@ -2032,7 +2041,7 @@ vfrStatementSubTitle :
 vfrSubtitleFlags [CIfrSubtitle & SObj] :
   << UINT8 LFlags = 0; >>
   subtitleFlagsField[LFlags] ( "\|" subtitleFlagsField[LFlags] )*
-                                                       << _PCATCH(SObj.SetFlags (LFlags)); >>
+                                                       << _PCATCH(SObj.SetFlags (LFlags)); SObj.CollectNodeInfo();>>
   ;
 
 subtitleFlagsField [UINT8 & Flags] :
@@ -2073,6 +2082,7 @@ vfrStatementStaticText :
                                                             AObj.SetHelp (_STOSID(S1->getText(), S1->getLine()));
                                                             _PCATCH(AObj.SetFlags (Flags), F->getLine());
                                                             AssignQuestionKey (AObj, KN);
+                                                            AObj.CollectNodeInfo();
                                                             CRT_END_OP (KN);
                                                           } else {
                                                             CIfrText TObj;
@@ -2080,6 +2090,7 @@ vfrStatementStaticText :
                                                             TObj.SetHelp (_STOSID(S1->getText(), S1->getLine()));
                                                             TObj.SetPrompt (_STOSID(S2->getText(), S2->getLine()));
                                                             TObj.SetTextTwo (TxtTwo);
+                                                            TObj.CollectNodeInfo();
                                                           }
                                                        >>
   { "," vfrStatementStatTagList }
@@ -2227,7 +2238,7 @@ vfrStatementGoto :
     E:"," 
       vfrStatementQuestionOptionList                   << OHObj->SetScope(1); CRT_END_OP (E);>>
   }
-  ";"                                                  << if (R1Obj != NULL) {delete R1Obj;} if (R2Obj != NULL) {delete R2Obj;} if (R3Obj != NULL) {delete R3Obj;} if (R4Obj != NULL) {delete R4Obj;} if (R5Obj != NULL) {delete R5Obj;}>>
+  ";"                                                  << if (R1Obj != NULL) {R1Obj->CollectNodeInfo(); delete R1Obj;} if (R2Obj != NULL) {R2Obj->CollectNodeInfo(); delete R2Obj;} if (R3Obj != NULL) {R3Obj->CollectNodeInfo(); delete R3Obj;} if (R4Obj != NULL) {R4Obj->CollectNodeInfo(); delete R4Obj;} if (R5Obj != NULL) {R5Obj->CollectNodeInfo(); delete R5Obj;}>>
   ;
 
 vfrGotoFlags [CIfrQuestionHeader *QHObj, UINT32 LineNum] :
@@ -2383,7 +2394,8 @@ vfrStatementCheckBox :
     Key "=" KN:Number  ","                             << AssignQuestionKey (*CBObj, KN); >>
   }
   vfrStatementQuestionOptionList
-  E:EndCheckBox                                        << CRT_END_OP (E);
+  E:EndCheckBox                                        << CBObj->CollectNodeInfo();
+                                                          CRT_END_OP (E);
                                                           if (GuidObj != NULL) {
                                                             GuidObj->SetScope(1);
                                                             CRT_END_OP (E);
@@ -2443,7 +2455,7 @@ vfrStatementAction :
 vfrActionFlags[CIfrAction & AObj, UINT32 LineNum] :
   << UINT8 HFlags = 0; >>
   actionFlagsField[HFlags] ( "\|" actionFlagsField[HFlags] )*
-                                                       << _PCATCH(AObj.SetFlags (HFlags), LineNum); >>
+                                                       << _PCATCH(AObj.SetFlags (HFlags), LineNum); AObj.CollectNodeInfo();>>
   ;
 
 actionFlagsField[UINT8 & HFlags] :
@@ -2496,6 +2508,7 @@ vfrStatementDate :
                                                           DObj.SetFlags (EFI_IFR_QUESTION_FLAG_DEFAULT, QF_DATE_STORAGE_TIME);
                                                           DObj.SetPrompt (_STOSID(YP->getText(), YP->getLine()));
                                                           DObj.SetHelp (_STOSID(YH->getText(), YH->getLine()));
+                                                          DObj.CollectNodeInfo();
                                                           if (VarIdStr[0] != NULL) { delete VarIdStr[0]; } if (VarIdStr[1] != NULL) { delete VarIdStr[1]; } if (VarIdStr[2] != NULL) { delete VarIdStr[2]; }
                                                        >>
                                                        << {CIfrDefault DefaultObj(Size, EFI_HII_DEFAULT_CLASS_STANDARD, EFI_IFR_TYPE_DATE, Val); DefaultObj.SetLineNo(L->getLine());} >>
@@ -2539,7 +2552,7 @@ minMaxDateStepDefault[EFI_HII_DATE & D, UINT8 KeyValue] :
 vfrDateFlags [CIfrDate & DObj, UINT32 LineNum] :
   << UINT8 LFlags = 0; >>
   dateFlagsField[LFlags] ( "\|" dateFlagsField[LFlags] )*
-                                                       << _PCATCH(DObj.SetFlags (EFI_IFR_QUESTION_FLAG_DEFAULT, LFlags), LineNum); >>
+                                                       << _PCATCH(DObj.SetFlags (EFI_IFR_QUESTION_FLAG_DEFAULT, LFlags), LineNum); DObj.CollectNodeInfo();>>
   ;
 
 dateFlagsField [UINT8 & Flags] :
@@ -2885,7 +2898,7 @@ vfrStatementNumeric :
                                                             ShrinkSize = 12;
                                                           }
                                                           NObj->ShrinkBinSize (ShrinkSize);
-
+                                                          NObj->CollectNodeInfo();
                                                           if (!IsSupported) {
                                                             _PCATCH (VFR_RETURN_INVALID_PARAMETER, L->getLine(), "Numeric question only support UINT8, UINT16, UINT32 and UINT64 data type.");
                                                           }
@@ -3061,7 +3074,7 @@ vfrStatementOneOf :
                                                             ShrinkSize = 12;
                                                           }
                                                           OObj->ShrinkBinSize (ShrinkSize);
-
+                                                          OObj->CollectNodeInfo();
                                                           if (!IsSupported) {
                                                             _PCATCH (VFR_RETURN_INVALID_PARAMETER, L->getLine(), "OneOf question only support UINT8, UINT16, UINT32 and UINT64 data type.");
                                                           }
@@ -3153,6 +3166,7 @@ vfrStatementString :
                                                             _PCATCH (VFR_RETURN_INVALID_PARAMETER, MAX->getLine(), "String MaxSize can't be less than String MinSize.");
                                                           }
                                                           SObj.SetMaxSize (StringMaxSize);
+                                                          SObj.CollectNodeInfo();
                                                        >>
   vfrStatementQuestionOptionList
   E:EndString                                          << CRT_END_OP (E); gIsStringOp = FALSE;>>
@@ -3207,6 +3221,7 @@ vfrStatementPassword :
                                                             _PCATCH (VFR_RETURN_INVALID_PARAMETER, MAX->getLine(), "Password MaxSize can't be less than Password MinSize.");
                                                           }
                                                           PObj.SetMaxSize (PasswordMaxSize);
+                                                          PObj.CollectNodeInfo();
                                                        >>
   { Encoding "=" Number "," }
   vfrStatementQuestionOptionList
@@ -3248,7 +3263,7 @@ vfrStatementOrderedList :
   }
   { F:FLAGS "=" vfrOrderedListFlags[OLObj, F->getLine()] {","}}
   vfrStatementQuestionOptionList
-  E:EndList                                            << CRT_END_OP (E); gIsOrderedList = FALSE;>>
+  E:EndList                                            << OLObj.CollectNodeInfo(); CRT_END_OP (E); gIsOrderedList = FALSE;>>
   ";"
   ;
 
@@ -3313,6 +3328,7 @@ vfrStatementTime :
                                                           TObj.SetFlags (EFI_IFR_QUESTION_FLAG_DEFAULT, QF_TIME_STORAGE_TIME);
                                                           TObj.SetPrompt (_STOSID(HP->getText(), HP->getLine()));
                                                           TObj.SetHelp (_STOSID(HH->getText(), HH->getLine()));
+                                                          TObj.CollectNodeInfo();
                                                           if (VarIdStr[0] != NULL) { delete VarIdStr[0]; } if (VarIdStr[1] != NULL) { delete VarIdStr[1]; } if (VarIdStr[2] != NULL) { delete VarIdStr[2]; }
                                                        >>
                                                        << {CIfrDefault DefaultObj(Size, EFI_HII_DEFAULT_CLASS_STANDARD, EFI_IFR_TYPE_TIME, Val); DefaultObj.SetLineNo(L->getLine());} >>
@@ -3356,7 +3372,7 @@ minMaxTimeStepDefault[EFI_HII_TIME & T, UINT8 KeyValue] :
 vfrTimeFlags [CIfrTime & TObj, UINT32 LineNum] :
   << UINT8 LFlags = 0; >>
   timeFlagsField[LFlags] ( "\|" timeFlagsField[LFlags] )*
-                                                       << _PCATCH(TObj.SetFlags(EFI_IFR_QUESTION_FLAG_DEFAULT, LFlags), LineNum); >>
+                                                       << _PCATCH(TObj.SetFlags(EFI_IFR_QUESTION_FLAG_DEFAULT, LFlags), LineNum); TObj.CollectNodeInfo();>>
   ;
 
 timeFlagsField [UINT8 & Flags] :
@@ -3466,7 +3482,13 @@ vfrStatementsuppressIfGrayOutIf:
 vfrStatementSuppressIfStatNew :
   << CIfrSuppressIf SIObj;>>
   L:SuppressIf                                         << SIObj.SetLineNo(L->getLine()); >>
-  { FLAGS "=" flagsField ( "\|" flagsField )* "," }
+  { 
+    FLAGS "=" flagsField ( "\|" flagsField )* "," 
+  //  | C: IdEqVal                                       << SIObj.SetCondition(C->getText());
+  //                                                        SIObj.CollectNodeInfo();>>
+  }
+
+  //{ FLAGS "=" flagsField ( "\|" flagsField )* "," }
   vfrStatementExpression[0]
   ";"
   ( vfrStatementStatList )*
@@ -3485,7 +3507,7 @@ vfrStatementGrayOutIfStatNew :
 
 vfrImageTag :
   << CIfrImage IObj; >>
-  L:Image "=" "IMAGE_TOKEN" "\(" S1:Number "\)"        << IObj.SetImageId (_STOSID(S1->getText(), S1->getLine())); IObj.SetLineNo(L->getLine()); >>
+  L:Image "=" "IMAGE_TOKEN" "\(" S1:Number "\)"        << IObj.SetImageId (_STOSID(S1->getText(), S1->getLine())); IObj.SetLineNo(L->getLine()); IObj.CollectNodeInfo();>>
   ;
 
 vfrLockedTag :
@@ -3562,7 +3584,7 @@ vfrStatementDisableIfQuest :
 vfrStatementRefresh :
   << CIfrRefresh RObj; >>
   L:Refresh                                            << RObj.SetLineNo(L->getLine()); >>
-  Interval "=" I:Number                                << RObj.SetRefreshInterval (_STOU8(I->getText(), I->getLine())); >>
+  Interval "=" I:Number                                << RObj.SetRefreshInterval (_STOU8(I->getText(), I->getLine())); RObj.CollectNodeInfo();>>
   ;
 
 vfrStatementRefreshEvent :
@@ -3571,13 +3593,13 @@ vfrStatementRefreshEvent :
     EFI_GUID      Guid;
   >>
   L:RefreshGuid                                        << RiObj.SetLineNo(L->getLine()); >>
-  "="  guidDefinition[Guid]                            << RiObj.SetRefreshEventGroutId (&Guid);  >>
+  "="  guidDefinition[Guid]                            << RiObj.SetRefreshEventGroutId (&Guid); RiObj.CollectNodeInfo();>>
   ;
 
 vfrStatementVarstoreDevice :
   << CIfrVarStoreDevice VDObj; >>
   L:VarstoreDevice                                     << VDObj.SetLineNo(L->getLine()); >>
-  "=" "STRING_TOKEN" "\(" S:Number "\)" ","            << VDObj.SetDevicePath (_STOSID(S->getText(), S->getLine())); >>
+  "=" "STRING_TOKEN" "\(" S:Number "\)" ","            << VDObj.SetDevicePath (_STOSID(S->getText(), S->getLine())); VDObj.CollectNodeInfo();>>
   ;
 
 vfrStatementSuppressIfQuest :
@@ -3770,7 +3792,8 @@ vfrStatementOneOfOption :
   (
     T:"," vfrImageTag                                  << OOOObj->SetScope (1); CRT_END_OP (T); >>
   )*
-  ";"                                                  << if (OOOObj != NULL) {delete OOOObj;} >>
+  ";"                                                  << OOOObj->CollectNodeInfo();
+                                                          if (OOOObj != NULL) {delete OOOObj;} >>
   ;
 
 vfrOneOfOptionFlags [CIfrOneOfOption & OOOObj, UINT32 LineNum] :
@@ -3816,6 +3839,7 @@ vfrStatementLabel :
                                                             CIfrLabel LObj2;
                                                             LObj2.SetLineNo(L->getLine());
                                                             LObj2.SetNumber (_STOU16(N->getText(), N->getLine()));
+                                                            LObj2.CollectNodeInfo();
                                                           }
                                                        >>
   ";"

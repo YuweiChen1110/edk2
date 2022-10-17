@@ -13,6 +13,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 #include "CommonLib.h"
 #include "VfrUtilityLib.h"
 #include "VfrFormPkg.h"
+#include "VfrOpCode.h"
 
 VOID
 CVfrBinaryOutput::WriteLine (
@@ -433,6 +434,404 @@ CVfrBufferConfig::DumpJson (
 
   fprintf (pFile, "}\n");
 }
+
+VOID
+CVfrBufferConfig::DumpYaml (
+  IN FILE         *pFile
+  )
+{
+  SOpNode          *pOpCode;
+  SOpNode          *OpOptionNode;
+  SOpInfoOneofNode *pOpOneOfCode = gCOpCodeDB.GetOpCodeOneOfNodeList();
+  fprintf(pFile,"#This is the Template Yaml file which saves OneOf OpCode Info.\n");
+  for (pOpCode = gCOpCodeDB.GetOpCodeList(); pOpCode != NULL; pOpCode = pOpCode->mNext){
+    if (pOpCode->Header.OpCode == EFI_IFR_FORM_SET_OP){
+      fprintf(pFile, "Formset:\n");     //Opcode -> 0x0E
+      fprintf(pFile, "  Guid:  {0x%02x, 0x%02x, 0x%02x, { 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x}\n",
+        pOpCode->Guid.Data1,
+        pOpCode->Guid.Data2,
+        pOpCode->Guid.Data3,
+        pOpCode->Guid.Data4[0],
+        pOpCode->Guid.Data4[1],
+        pOpCode->Guid.Data4[2],
+        pOpCode->Guid.Data4[3],
+        pOpCode->Guid.Data4[4],
+        pOpCode->Guid.Data4[5],
+        pOpCode->Guid.Data4[6],
+        pOpCode->Guid.Data4[7]
+      );
+      fprintf(pFile, "  Title:  %d  # Title STRING_ID\n", pOpCode->FormSetTitle);
+      fprintf(pFile, "  Help:  %d  # Help STRING_ID\n", pOpCode->Help);
+      // fprintf(pFile, "    Flags:    %d  # Flags STRING_ID\n", pOpCode->Flags);
+      if (pOpCode->ClassGuidNum != 0){
+        for (int num=0; num < pOpCode->ClassGuidNum; num++){
+          fprintf(pFile, "    ClassGuid%d:  {0x%02x, 0x%02x, 0x%02x, { 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x}\n", num+1,
+            pOpCode->ClassGuid[num].Data1,
+            pOpCode->ClassGuid[num].Data2,
+            pOpCode->ClassGuid[num].Data3,
+            pOpCode->ClassGuid[num].Data4[0],
+            pOpCode->ClassGuid[num].Data4[1],
+            pOpCode->ClassGuid[num].Data4[2],
+            pOpCode->ClassGuid[num].Data4[3],
+            pOpCode->ClassGuid[num].Data4[4],
+            pOpCode->ClassGuid[num].Data4[5],
+            pOpCode->ClassGuid[num].Data4[6],
+            pOpCode->ClassGuid[num].Data4[7]
+          );
+        }
+      }
+    }
+    if (pOpCode->Header.OpCode == EFI_IFR_GUID_OP & pOpCode->Class != NULL){
+      fprintf(pFile, "  Class:  %d\n", pOpCode->Class);
+    }
+    if (pOpCode->Header.OpCode == EFI_IFR_GUID_OP & pOpCode->SubClass != NULL){
+      fprintf(pFile, "  SubClass:  %d\n", pOpCode->SubClass);
+    }
+    if (pOpCode->Header.OpCode == EFI_IFR_DEFAULTSTORE_OP){
+      fprintf(pFile, "  - defaultstore:\n");
+      // fprintf(pFile, "      type:  %d\n", pOpCode->VarStoreId);
+      fprintf(pFile, "      name:  %d\n", pOpCode->DefaultName);
+      fprintf(pFile, "      attribute:  %d\n", pOpCode->DefaultId);
+    }
+    if (pOpCode->Header.OpCode == EFI_IFR_VARSTORE_OP){
+      fprintf(pFile, "  - varstore:\n");
+      fprintf(pFile, "      varid:  %d\n", pOpCode->VarStoreId);
+      fprintf(pFile, "      name:  %s\n", pOpCode->Name);
+      fprintf(pFile, "      size:  %d\n", pOpCode->Size);
+      fprintf(pFile, "      guid:  {0x%02x, 0x%02x, 0x%02x, { 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x}\n",
+        pOpCode->Guid.Data1,
+        pOpCode->Guid.Data2,
+        pOpCode->Guid.Data3,
+        pOpCode->Guid.Data4[0],
+        pOpCode->Guid.Data4[1],
+        pOpCode->Guid.Data4[2],
+        pOpCode->Guid.Data4[3],
+        pOpCode->Guid.Data4[4],
+        pOpCode->Guid.Data4[5],
+        pOpCode->Guid.Data4[6],
+        pOpCode->Guid.Data4[7]
+      );
+    }
+    if (pOpCode->Header.OpCode == EFI_IFR_VARSTORE_EFI_OP){
+      fprintf(pFile, "  - efivarstore:\n");
+      fprintf(pFile, "      varid:  %d\n", pOpCode->VarStoreId);
+      fprintf(pFile, "      name:  %s\n", pOpCode->Name);
+      fprintf(pFile, "      size:  %d\n", pOpCode->Size);
+      fprintf(pFile, "      guid:  {0x%02x, 0x%02x, 0x%02x, { 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x}\n",
+        pOpCode->Guid.Data1,
+        pOpCode->Guid.Data2,
+        pOpCode->Guid.Data3,
+        pOpCode->Guid.Data4[0],
+        pOpCode->Guid.Data4[1],
+        pOpCode->Guid.Data4[2],
+        pOpCode->Guid.Data4[3],
+        pOpCode->Guid.Data4[4],
+        pOpCode->Guid.Data4[5],
+        pOpCode->Guid.Data4[6],
+        pOpCode->Guid.Data4[7]
+      );
+      fprintf(pFile, "      attribute:  %d\n", pOpCode->Attributes);
+    }
+    if (pOpCode->Header.OpCode == EFI_IFR_VARSTORE_NAME_VALUE_OP){
+      fprintf(pFile, "  - namevaluevarstore:\n");
+      fprintf(pFile, "      varid:  %d\n", pOpCode->VarStoreId);
+      fprintf(pFile, "      name:  %s\n", pOpCode->Name);
+      fprintf(pFile, "      guid:  {0x%02x, 0x%02x, 0x%02x, { 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x}\n",
+        pOpCode->Guid.Data1,
+        pOpCode->Guid.Data2,
+        pOpCode->Guid.Data3,
+        pOpCode->Guid.Data4[0],
+        pOpCode->Guid.Data4[1],
+        pOpCode->Guid.Data4[2],
+        pOpCode->Guid.Data4[3],
+        pOpCode->Guid.Data4[4],
+        pOpCode->Guid.Data4[5],
+        pOpCode->Guid.Data4[6],
+        pOpCode->Guid.Data4[7]
+      );
+    }
+    if (pOpCode->Header.OpCode == EFI_IFR_FORM_OP){
+      fprintf(pFile, "  - form:\n"); // Opcode -> 1
+      // fprintf(pFile, "      # Header Length:  %d\n", pOpCode->Header.Length);
+      // fprintf(pFile, "      # Header Scope:  %d\n", pOpCode->Header.Scope);
+      fprintf(pFile, "      FormId:  %d  # FormId STRING_ID\n", pOpCode->FormId);
+      fprintf(pFile, "      FormTitle:  %d  # FormTitle STRING_ID\n", pOpCode->FormTitle);
+    }
+    if (pOpCode->Header.OpCode == EFI_IFR_GUID_OP & pOpCode->ExtendOpCode == EFI_IFR_EXTEND_OP_LABEL){
+      fprintf(pFile, "      - label:\n");
+      fprintf(pFile, "          labelnumber:  %d  # LabelNumber\n", pOpCode->LabelNumber);
+    }
+    if (pOpCode->Header.OpCode == EFI_IFR_GUID_OP & pOpCode->ExtendOpCode == NULL){
+      fprintf(pFile, "      - guidop:\n");
+      fprintf(pFile, "          guid:  {0x%02x, 0x%02x, 0x%02x, { 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x}\n",
+        pOpCode->Guid.Data1,
+        pOpCode->Guid.Data2,
+        pOpCode->Guid.Data3,
+        pOpCode->Guid.Data4[0],
+        pOpCode->Guid.Data4[1],
+        pOpCode->Guid.Data4[2],
+        pOpCode->Guid.Data4[3],
+        pOpCode->Guid.Data4[4],
+        pOpCode->Guid.Data4[5],
+        pOpCode->Guid.Data4[6],
+        pOpCode->Guid.Data4[7]
+      );
+    }
+    if (pOpCode->Header.OpCode == EFI_IFR_STRING_OP){
+      fprintf(pFile, "      - string:\n"); // Opcode -> 0x1C
+      // fprintf(pFile, "          # Header Length:  %d\n", pOpCode->Header.Length);
+      // fprintf(pFile, "          # Header Scope:  %d\n", pOpCode->Header.Scope);
+      fprintf(pFile, "          prompt:  %d  # Statement Prompt STRING_ID\n", pOpCode->QuestionHeader.Header.Prompt);
+      fprintf(pFile, "          help:  %d  # Statement Help STRING_ID\n", pOpCode->QuestionHeader.Header.Help);
+      fprintf(pFile, "          questionid:  %d  # Question QuestionId\n", pOpCode->QuestionHeader.QuestionId);
+      fprintf(pFile, "          varstoreid:  %d  # Question VarStoreId\n", pOpCode->QuestionHeader.VarStoreId);
+      fprintf(pFile, "          varname:  %d  # Question VarName STRING_ID\n", pOpCode->QuestionHeader.VarStoreInfo.VarName);
+      fprintf(pFile, "          varoffset:  %d  # Question VarOffset\n", pOpCode->QuestionHeader.VarStoreInfo.VarOffset);
+      fprintf(pFile, "          flags:  %d  # Question Flags\n", pOpCode->QuestionHeader.Flags);
+      fprintf(pFile, "          stringflags:  %d  # Flags\n", pOpCode->Flags);
+      fprintf(pFile, "          stringminsize:  %d  # MinSize\n", pOpCode->StringMinSize);
+      fprintf(pFile, "          stringmaxsize:  %d  # MaxSize\n", pOpCode->StringMaxSize);
+    }
+    if (pOpCode->Header.OpCode == EFI_IFR_ORDERED_LIST_OP){
+      fprintf(pFile, "      - orderedlist:\n");
+      // fprintf(pFile, "          # Header Scope:  %d\n", pOpCode->Header.Scope);
+      fprintf(pFile, "          prompt:  %d  # Statement Prompt STRING_ID\n", pOpCode->QuestionHeader.Header.Prompt);
+      fprintf(pFile, "          help:  %d  # Statement Help STRING_ID\n", pOpCode->QuestionHeader.Header.Help);
+      fprintf(pFile, "          questionid:  %d  # Question QuestionId\n", pOpCode->QuestionHeader.QuestionId);
+      fprintf(pFile, "          varstoreid:  %d  # Question VarStoreId\n", pOpCode->QuestionHeader.VarStoreId);
+      fprintf(pFile, "          maxContainers:  %d\n", pOpCode->MaxContainers);
+      fprintf(pFile, "          flags:  %d\n", pOpCode->Flags);
+    }
+    if (pOpCode->Header.OpCode == EFI_IFR_ONE_OF_OP){
+      fprintf(pFile, "      - oneof:\n"); // Opcode -> 5
+      // fprintf(pFile, "          # Header Length:  %d\n", pOpCode->Header.Length);
+      // fprintf(pFile, "          # Header Scope:  %d\n", pOpCode->Header.Scope);
+      fprintf(pFile, "          prompt:  %d  # Statement Prompt STRING_ID\n", pOpCode->QuestionHeader.Header.Prompt);
+      fprintf(pFile, "          help:  %d  # Statement Help STRING_ID\n", pOpCode->QuestionHeader.Header.Help);
+      fprintf(pFile, "          questionid:  %d  # Question QuestionId\n", pOpCode->QuestionHeader.QuestionId);
+      fprintf(pFile, "          varstoreid:  %d  # Question VarStoreId\n", pOpCode->QuestionHeader.VarStoreId);
+      fprintf(pFile, "          varname:  %d  # Question VarName STRING_ID\n", pOpCode->QuestionHeader.VarStoreInfo.VarName);
+      fprintf(pFile, "          varoffset:  %d  # Question VarOffset\n", pOpCode->QuestionHeader.VarStoreInfo.VarOffset);
+      fprintf(pFile, "          flags:  %d  # Question Flags\n", pOpCode->QuestionHeader.Flags);
+    }
+    if (pOpCode->Header.OpCode == EFI_IFR_ONE_OF_OPTION_OP){
+      fprintf(pFile, "          - Option:  %d\n", pOpCode->Option);
+      fprintf(pFile, "              Option Flag:  %d\n", pOpCode->Flags);
+      fprintf(pFile, "              Option type:  %d\n", pOpCode->Type);
+      fprintf(pFile, "              Option Value:  %d\n", pOpCode->Value.b);
+    }
+    if (pOpCode->Header.OpCode == EFI_IFR_NUMERIC_OP){
+      fprintf(pFile, "      - numeric:\n"); // Opcode -> 7
+      // fprintf(pFile, "          # Header Length:  %d\n", pOpCode->Header.Length);
+      // fprintf(pFile, "          # Header Scope:  %d\n", pOpCode->Header.Scope);
+      fprintf(pFile, "          prompt:  %d  # Statement Prompt STRING_ID\n", pOpCode->QuestionHeader.Header.Prompt);
+      fprintf(pFile, "          help:  %d  # Statement Help STRING_ID\n", pOpCode->QuestionHeader.Header.Help);
+      fprintf(pFile, "          questionid:  %d  # Question QuestionId\n", pOpCode->QuestionHeader.QuestionId);
+      fprintf(pFile, "          varstoreid:  %d  # Question VarStoreId\n", pOpCode->QuestionHeader.VarStoreId);
+      fprintf(pFile, "          varname:  %d  # Question VarName STRING_ID\n", pOpCode->QuestionHeader.VarStoreInfo.VarName);
+      fprintf(pFile, "          varoffset:  %d  # Question VarOffset\n", pOpCode->QuestionHeader.VarStoreInfo.VarOffset);
+      fprintf(pFile, "          flags:  %d  # Question Flags\n", pOpCode->QuestionHeader.Flags);
+      fprintf(pFile, "          maxvalue:  %d\n", pOpCode->data.u8.MaxValue);
+      fprintf(pFile, "          minvalue:  %d\n", pOpCode->data.u8.MinValue);
+      fprintf(pFile, "          step:  %d\n", pOpCode->data.u8.Step);
+    }
+    if (pOpCode->Header.OpCode == EFI_IFR_CHECKBOX_OP){
+      fprintf(pFile, "      - checkbox:\n"); // Opcode -> 6
+      // fprintf(pFile, "          # Header Length:  %d\n", pOpCode->Header.Length);
+      // fprintf(pFile, "          # Header Scope:  %d\n", pOpCode->Header.Scope);
+      fprintf(pFile, "          prompt:  %d  # Statement Prompt STRING_ID\n", pOpCode->QuestionHeader.Header.Prompt);
+      fprintf(pFile, "          help:  %d  # Statement Help STRING_ID\n", pOpCode->QuestionHeader.Header.Help);
+      fprintf(pFile, "          questionid:  %d  # Question QuestionId\n", pOpCode->QuestionHeader.QuestionId);
+      fprintf(pFile, "          varstoreid:  %d  # Question VarStoreId\n", pOpCode->QuestionHeader.VarStoreId);
+      fprintf(pFile, "          varname:  %d  # Question VarName STRING_ID\n", pOpCode->QuestionHeader.VarStoreInfo.VarName);
+      fprintf(pFile, "          varoffset:  %d  # Question VarOffset\n", pOpCode->QuestionHeader.VarStoreInfo.VarOffset);
+      fprintf(pFile, "          flags:  %d  # Flags\n", pOpCode->Flags);
+    }
+    if (pOpCode->Header.OpCode == EFI_IFR_REF_OP){
+      fprintf(pFile, "      - goto:\n");
+      if (pOpCode->Header.Length == sizeof (EFI_IFR_REF)){
+        fprintf(pFile, "          formid:  %d\n", pOpCode->FormId);
+        fprintf(pFile, "          questionid:  %d\n", pOpCode->QuestionHeader.QuestionId);
+        fprintf(pFile, "          prompt:  %d\n", pOpCode->QuestionHeader.Header.Prompt);
+        fprintf(pFile, "          help:  %d\n", pOpCode->QuestionHeader.Header.Help);
+      }
+      else if (pOpCode->Header.Length == sizeof (EFI_IFR_REF2)){
+        fprintf(pFile, "          formid:  %d\n", pOpCode->FormId);
+        fprintf(pFile, "          questionid:  %d\n", pOpCode->QuestionHeader.QuestionId);
+        fprintf(pFile, "          prompt:  %d\n", pOpCode->QuestionHeader.Header.Prompt);
+        fprintf(pFile, "          help:  %d\n", pOpCode->QuestionHeader.Header.Help);
+      }
+      else if (pOpCode->Header.Length == sizeof (EFI_IFR_REF3)){
+        fprintf(pFile, "          formid:  %d\n", pOpCode->FormId);
+        fprintf(pFile, "          formsetid:  {0x%02x, 0x%02x, 0x%02x, { 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x}\n",
+          pOpCode->FormSetId.Data1,
+          pOpCode->FormSetId.Data2,
+          pOpCode->FormSetId.Data3,
+          pOpCode->FormSetId.Data4[0],
+          pOpCode->FormSetId.Data4[1],
+          pOpCode->FormSetId.Data4[2],
+          pOpCode->FormSetId.Data4[3],
+          pOpCode->FormSetId.Data4[4],
+          pOpCode->FormSetId.Data4[5],
+          pOpCode->FormSetId.Data4[6],
+          pOpCode->FormSetId.Data4[7]
+        );
+        fprintf(pFile, "          questionid:  %d\n", pOpCode->QuestionHeader.QuestionId);
+        fprintf(pFile, "          prompt:  %d\n", pOpCode->QuestionHeader.Header.Prompt);
+        fprintf(pFile, "          help:  %d\n", pOpCode->QuestionHeader.Header.Help);
+      }
+      else if (pOpCode->Header.Length == sizeof (EFI_IFR_REF4)){
+        fprintf(pFile, "          formid:  %d\n", pOpCode->FormId);
+        fprintf(pFile, "          formsetid:  {0x%02x, 0x%02x, 0x%02x, { 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x}\n",
+          pOpCode->FormSetId.Data1,
+          pOpCode->FormSetId.Data2,
+          pOpCode->FormSetId.Data3,
+          pOpCode->FormSetId.Data4[0],
+          pOpCode->FormSetId.Data4[1],
+          pOpCode->FormSetId.Data4[2],
+          pOpCode->FormSetId.Data4[3],
+          pOpCode->FormSetId.Data4[4],
+          pOpCode->FormSetId.Data4[5],
+          pOpCode->FormSetId.Data4[6],
+          pOpCode->FormSetId.Data4[7]
+        );
+        fprintf(pFile, "          questionid:  %d\n", pOpCode->QuestionHeader.QuestionId);
+        fprintf(pFile, "          prompt:  %d\n", pOpCode->QuestionHeader.Header.Prompt);
+        fprintf(pFile, "          help:  %d\n", pOpCode->QuestionHeader.Header.Help);
+        fprintf(pFile, "          devicepath:  %d\n", pOpCode->DevicePath);
+      }
+      else if (pOpCode->Header.Length == sizeof (EFI_IFR_REF5)){
+        fprintf(pFile, "          prompt:  %d\n", pOpCode->QuestionHeader.Header.Prompt);
+        fprintf(pFile, "          help:  %d\n", pOpCode->QuestionHeader.Header.Help);
+      }
+    }
+    if (pOpCode->Header.OpCode == EFI_IFR_SUBTITLE_OP){
+      fprintf(pFile, "      - subtitle:\n");
+      // fprintf(pFile, "          # Header Scope:  %d\n", pOpCode->Header.Scope);
+      fprintf(pFile, "          prompt:  %d  # Statement Prompt STRING_ID\n", pOpCode->StatementHeader.Prompt);
+    }
+    if (pOpCode->Header.OpCode == EFI_IFR_ACTION_OP){
+      fprintf(pFile, "      - text:\n");
+      // fprintf(pFile, "          # Header Scope:  %d\n", pOpCode->Header.Scope);
+      fprintf(pFile, "          prompt:  %d  # Statement Prompt STRING_ID\n", pOpCode->QuestionHeader.Header.Prompt);
+      fprintf(pFile, "          help:  %d  # Statement Help STRING_ID\n", pOpCode->QuestionHeader.Header.Help);
+      fprintf(pFile, "          questionid:  %d  # Question QuestionId\n", pOpCode->QuestionHeader.QuestionId);
+      fprintf(pFile, "          varstoreid:  %d  # Question VarStoreId\n", pOpCode->QuestionHeader.VarStoreId);
+      fprintf(pFile, "          flags:  %d  # Question Flags\n", pOpCode->QuestionHeader.Flags);
+      fprintf(pFile, "          QuestionConfig:  %d  # QuestionConfig\n", pOpCode->QuestionConfig);
+    }
+    if (pOpCode->Header.OpCode == EFI_IFR_RESET_BUTTON_OP){
+      fprintf(pFile, "      - resetbutton:\n");
+      // fprintf(pFile, "          # Header Scope:  %d\n", pOpCode->Header.Scope);
+      fprintf(pFile, "          prompt:  %d  # Statement Prompt STRING_ID\n", pOpCode->StatementHeader.Prompt);
+      fprintf(pFile, "          help:  %d  # Statement Help STRING_ID\n", pOpCode->StatementHeader.Help);
+      fprintf(pFile, "          defaultid:  %d\n", pOpCode->DefaultId);
+    }
+    if (pOpCode->Header.OpCode == EFI_IFR_TEXT_OP){
+      fprintf(pFile, "      - text:\n");
+      // fprintf(pFile, "          # Header Scope:  %d\n", pOpCode->Header.Scope);
+      fprintf(pFile, "          prompt:  %d  # Statement Prompt STRING_ID\n", pOpCode->StatementHeader.Prompt);
+      fprintf(pFile, "          help:  %d  # Statement Help STRING_ID\n", pOpCode->StatementHeader.Help);
+      fprintf(pFile, "          text:  %d  # Statement Help STRING_ID\n", pOpCode->TextTwo);
+    }
+    if (pOpCode->Header.OpCode == EFI_IFR_DATE_OP){
+      fprintf(pFile, "      - date:\n");
+      // fprintf(pFile, "          # Header Scope:  %d\n", pOpCode->Header.Scope);
+      fprintf(pFile, "          questionid:  %d  # Statement Prompt STRING_ID\n", pOpCode->QuestionHeader.QuestionId);
+      fprintf(pFile, "          varstoreid:  %d  # Question VarStoreId\n", pOpCode->QuestionHeader.VarStoreId);
+      fprintf(pFile, "          varname:  %d\n", pOpCode->QuestionHeader.VarStoreInfo.VarName);
+      fprintf(pFile, "          varoffset:  %d\n", pOpCode->QuestionHeader.VarStoreInfo.VarOffset);
+      fprintf(pFile, "          prompt:  %d  # Statement Prompt STRING_ID\n", pOpCode->StatementHeader.Prompt);
+      fprintf(pFile, "          help:  %d  # Statement Help STRING_ID\n", pOpCode->StatementHeader.Help);
+      fprintf(pFile, "          flags:  %d\n", pOpCode->Flags);
+    }
+    if (pOpCode->Header.OpCode == EFI_IFR_TIME_OP){
+      fprintf(pFile, "      - time:\n");
+      // fprintf(pFile, "          # Header Scope:  %d\n", pOpCode->Header.Scope);
+      fprintf(pFile, "          questionid:  %d  # Statement Prompt STRING_ID\n", pOpCode->QuestionHeader.QuestionId);
+      fprintf(pFile, "          varstoreid:  %d  # Question VarStoreId\n", pOpCode->QuestionHeader.VarStoreId);
+      fprintf(pFile, "          varname:  %d\n", pOpCode->QuestionHeader.VarStoreInfo.VarName);
+      fprintf(pFile, "          varoffset:  %d\n", pOpCode->QuestionHeader.VarStoreInfo.VarOffset);
+      fprintf(pFile, "          prompt:  %d  # Statement Prompt STRING_ID\n", pOpCode->StatementHeader.Prompt);
+      fprintf(pFile, "          help:  %d  # Statement Help STRING_ID\n", pOpCode->StatementHeader.Help);
+      fprintf(pFile, "          flags:  %d\n", pOpCode->Flags);
+    }
+    if (pOpCode->Header.OpCode == EFI_IFR_DEFAULT_OP){
+      fprintf(pFile, "          - default:\n");
+      // fprintf(pFile, "          # Header Scope:  %d\n", pOpCode->Header.Scope);
+      fprintf(pFile, "              prompt:  %d  # Statement Prompt STRING_ID\n", pOpCode->StatementHeader.Prompt);
+      fprintf(pFile, "              help:  %d  # Statement Help STRING_ID\n", pOpCode->StatementHeader.Help);
+      fprintf(pFile, "              type:  %d\n", pOpCode->Type);
+      fprintf(pFile, "              varstoreid:  %d\n", pOpCode->DefaultId);
+      if (pOpCode->Type == EFI_IFR_TYPE_DATE){
+        fprintf(pFile, "              value:  %d/%d/%d\n", pOpCode->Value.date.Year, pOpCode->Value.date.Month, pOpCode->Value.date.Day);
+      }
+      else if(pOpCode->Type == EFI_IFR_TYPE_TIME){
+        fprintf(pFile, "              value:  %d:%d:%d\n", pOpCode->Value.time.Hour, pOpCode->Value.time.Minute, pOpCode->Value.time.Second);
+      }
+      else if(pOpCode->Type == EFI_IFR_TYPE_STRING){
+        fprintf(pFile, "              value:  %d\n", pOpCode->Value.string);
+      }
+      else if(pOpCode->Type == EFI_IFR_TYPE_NUM_SIZE_8){
+        fprintf(pFile, "              value:  %d\n", pOpCode->Value.u8);
+      }
+      else if(pOpCode->Type == EFI_IFR_TYPE_NUM_SIZE_16){
+        fprintf(pFile, "              value:  %d\n", pOpCode->Value.u16);
+      }
+      else if(pOpCode->Type == EFI_IFR_TYPE_NUM_SIZE_32){
+        fprintf(pFile, "              value:  %d\n", pOpCode->Value.u32);
+      }
+      else if(pOpCode->Type == EFI_IFR_TYPE_NUM_SIZE_64){
+        fprintf(pFile, "              value:  %lld\n", pOpCode->Value.u64);
+      }
+      else if(pOpCode->Type == EFI_IFR_TYPE_BOOLEAN){
+        fprintf(pFile, "              value:  %d\n", pOpCode->Value.b);
+      }
+      else{
+        fprintf(pFile, "              value:  %d\n", pOpCode->Value.u8);
+      }
+    }
+    if (pOpCode->Header.OpCode == EFI_IFR_SUPPRESS_IF_OP){
+      fprintf(pFile, "      - suppressif:\n");
+      // fprintf(pFile, "          # Header Scope:  %d\n", pOpCode->Header.Scope);
+      fprintf(pFile, "          condition:  %s\n", pOpCode->Condition);
+    }
+  }
+  // for (int num = gCOpCodeDB.mOneOfNum; num != 0; num--){
+  //   fprintf(pFile, "- Op oneof:   # Opcode -> 5\n");
+  //   fprintf(pFile, "    # Header Length: %d\n", pOpOneOfCode->OpOneOfNode->Header.Length);
+  //   fprintf(pFile, "    # Header Scope: %d\n", pOpOneOfCode->OpOneOfNode->Header.Scope);
+  //   fprintf(pFile, "    prompt:       %d  # Statement Prompt STRING_ID\n", pOpOneOfCode->OpOneOfNode->QuestionHeader.Header.Prompt);
+  //   fprintf(pFile, "    help:         %d  # Statement Help STRING_ID\n", pOpOneOfCode->OpOneOfNode->QuestionHeader.Header.Help);
+  //   fprintf(pFile, "    questionid:   %d  # Question QuestionId\n", pOpOneOfCode->OpOneOfNode->QuestionHeader.QuestionId);
+  //   fprintf(pFile, "    varstoreid:   %d  # Question VarStoreId\n", pOpOneOfCode->OpOneOfNode->QuestionHeader.VarStoreId);
+  //   fprintf(pFile, "    varname:      %d  # Question VarName STRING_ID\n", pOpOneOfCode->OpOneOfNode->QuestionHeader.VarStoreInfo.VarName);
+  //   fprintf(pFile, "    varoffset:    %d  # Question VarOffset\n", pOpOneOfCode->OpOneOfNode->QuestionHeader.VarStoreInfo.VarOffset);
+  //   fprintf(pFile, "    flags:        %d  # Question Flags\n", pOpOneOfCode->OpOneOfNode->QuestionHeader.Flags);
+  //   pOpOneOfCode = pOpOneOfCode->mNext;
+  // }
+
+  // for (pOpOneOfCode = gCOpCodeDB.GetOpCodeOneOfNodeList(); pOpOneOfCode->mNext != NULL; pOpOneOfCode = pOpOneOfCode->mNext){
+  //     fprintf(pFile, "- Op oneof:   # Opcode -> 5\n");
+      // fprintf(pFile, "    # Header Length: %d\n", pOpOneOfCode->OpOneOfNode->Header.Length);
+      // fprintf(pFile, "    # Header Scope: %d\n", pOpOneOfCode->OpOneOfNode->Header.Scope);
+      // fprintf(pFile, "    prompt:       %d  # Statement Prompt STRING_ID\n", pOpOneOfCode->OpOneOfNode->QuestionHeader.Header.Prompt);
+      // fprintf(pFile, "    help:         %d  # Statement Help STRING_ID\n", pOpOneOfCode->OpOneOfNode->QuestionHeader.Header.Help);
+      // fprintf(pFile, "    questionid:   %d  # Question QuestionId\n", pOpOneOfCode->OpOneOfNode->QuestionHeader.QuestionId);
+      // fprintf(pFile, "    varstoreid:   %d  # Question VarStoreId\n", pOpOneOfCode->OpOneOfNode->QuestionHeader.VarStoreId);
+      // fprintf(pFile, "    varname:      %d  # Question VarName STRING_ID\n", pOpOneOfCode->OpOneOfNode->QuestionHeader.VarStoreInfo.VarName);
+      // fprintf(pFile, "    varoffset:    %d  # Question VarOffset\n", pOpOneOfCode->OpOneOfNode->QuestionHeader.VarStoreInfo.VarOffset);
+      // fprintf(pFile, "    flags:        %d  # Question Flags\n", pOpOneOfCode->OpOneOfNode->QuestionHeader.Flags);
+    // for (OpOptionNode = pOpOneOfCode->OpOptionNode; OpOptionNode!=NULL; OpOptionNode = OpOptionNode->mNext){
+    //   fprintf(pFile, "    Option:       %d\n", OpOptionNode->Option);
+    //   fprintf(pFile, "    Option Flag:  %d\n", OpOptionNode->Flags);
+    //   fprintf(pFile, "    Option type:  %d\n", OpOptionNode->Type);
+    //   fprintf(pFile, "    Option Value: %d\n", OpOptionNode->Value.b);
+    // }
+  // }
+  fprintf (pFile, "#The End\n");
+}
+
 UINT8
 CVfrBufferConfig::Write (
   IN CONST CHAR8         Mode,

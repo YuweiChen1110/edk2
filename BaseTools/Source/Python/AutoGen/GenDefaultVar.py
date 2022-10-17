@@ -4,7 +4,6 @@ import re
 import copy
 from struct import unpack
 import os
-from pluggy._hooks import varnames
 import Common.EdkLogger as EdkLogger
 
 class GUID(Structure):
@@ -540,7 +539,7 @@ class DefaultVariableGenerator():
             storenum = len(item.fields)
             for storeid in range(storenum):
                 for Var in item.fields[storeid]:
-                    print('If Var.Offset in Name_Offset: ', Var.Offset in Name_Offset)
+                    # print('If Var.Offset in Name_Offset: ', Var.Offset in Name_Offset)
                     if Var.Offset not in Name_Offset:
                         print('Offset:', Var.Offset)
                     VariableInfo.append('  defaultstore %-5s | %-30s | %-15s | %-15s | %s'%(storeid, Name_Offset[Var.Offset], Var.Type, Var.Offset, Var.Value))
