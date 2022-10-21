@@ -142,6 +142,8 @@ class BIOSTREE:
                 Info.append("    - ProducerId: {}".format(ProducerId))
                 Info.append("    - ImageId: {}".format(ImageId))
                 Info.append("\n")
+                Info.append("- UPLD buffer")
+                Info.append("  Buffer: {}".format(TargetDict.get(Key).get('Upld_Buffer')))
             else:
                 print("Do not find the Upld Info section!!!\n")
         elif TargetDict[Key]["Type"] in FvType:
@@ -193,6 +195,7 @@ class BIOSTREE:
                 TreeInfo[key]["ProducerId"] = self.Data.UpldInfo.ProducerId
                 TreeInfo[key]["ImageId"] = self.Data.UpldInfo.ImageId
                 TreeInfo[key]["Upld_Info_Align"] = self.Data.Upld_Info_Align
+                TreeInfo[key]["Upld_Buffer"] = self.Data.UpldBuffer
         elif self.type == FV_TREE or  self.type == SEC_FV_TREE:
             key = str(self.Data.FvId)
             TreeInfo[key] = collections.OrderedDict()

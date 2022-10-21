@@ -55,6 +55,7 @@ class ElfNode:
         self.SecList = []
         self.UpldInfoSection = None
         self.UpldInfo = None
+        self.UpldBuffer = b''
         self.Name = "ELF"
         self.HeaderLength = len(struct2stream(self.Header))
         self.HOffset = 0
@@ -85,7 +86,9 @@ class ElfNode:
             if buffer[item.SH_Offset:item.SH_Offset+4] == b'PLDH' or buffer[item.SH_Offset:item.SH_Offset+4] == b'UPLD':
                 self.UpldInfoSection = item
                 self.UpldInfo = UNIVERSAL_PAYLOAD_INFO.from_buffer_copy(buffer[item.SH_Offset:item.SH_Offset+item.SH_Size])
-                if (self.UpldInfoSection.SH_Offset - self.Header.ELF_Entry) % 4 == 0:
+                self.UpldBuffer = struct2stream(self.UpldInfo)
+                if (self.UpldInfoSection.SH_Offset) % 4 == 0:
+                # if (self.UpldInfoSection.SH_Offset - self.Header.ELF_Entry) % 4 == 0:
                     self.Upld_Info_Align = True
 
 
