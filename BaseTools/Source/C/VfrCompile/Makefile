@@ -24,8 +24,8 @@ INC = $(INC) -I $(BASE_TOOLS_PATH)\Source\C\VfrCompile\Pccts\h
 # 	antlr -CC -e3 -ck 3 -k 2 -fl VfrParser.dlg -ft VfrTokens.h -o . VfrSyntax.g
 #	pushd . & cd Pccts & $(MAKE) clean
 
-VfrLexer.cpp VfrLexer.h: VfrParser.dlg
-	dlg -C2 -i -CC -cl VfrLexer -o . VfrParser.dlg
+#VfrLexer.cpp VfrLexer.h: VfrParser.dlg
+#	dlg -C2 -i -CC -cl VfrLexer -o . VfrParser.dlg
 
 ATokenBuffer.obj: Pccts\h\ATokenBuffer.cpp
 	$(CXX) -c $(CPPFLAGS) $(INC) $? -Fo$@
