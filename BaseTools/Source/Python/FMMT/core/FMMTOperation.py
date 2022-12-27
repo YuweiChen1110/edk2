@@ -81,7 +81,7 @@ def DeleteFfs(inputfile: str, TargetFfs_name: str, outputfile: str, Fv_name: str
             f.write(FmmtParser.FinalData)
         logger.debug('Encapsulated data is saved in {}.'.format(outputfile))
 
-def AddNewFfs(inputfile: str, Fv_name: str, newffsfile: str, outputfile: str) -> None:
+def AddNewFfs(inputfile: str, Fv_name: str, newffsfile: str, outputfile: str, order=None) -> None:
     if not os.path.exists(inputfile):
         logger.error("Invalid inputfile, can not open {}.".format(inputfile))
         raise Exception("Process Failed: Invalid inputfile!")
@@ -114,7 +114,7 @@ def AddNewFfs(inputfile: str, Fv_name: str, newffsfile: str, outputfile: str) ->
                 NewFmmtParser.ParserFromRoot(NewFmmtParser.WholeFvTree, new_ffs_data, TargetFfsPad.Data.HOffset+TargetFfsPad.Data.Size)
             logger.debug('Done!')
             FfsMod = FvHandler(NewFmmtParser.WholeFvTree.Child[0], TargetFfsPad)
-            Status = FfsMod.AddFfs()
+            Status = FfsMod.AddFfs(order)
     else:
         logger.error('Target Fv not found!!!')
     # 4. Data Encapsulation

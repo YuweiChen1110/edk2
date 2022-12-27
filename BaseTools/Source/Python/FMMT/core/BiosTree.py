@@ -65,10 +65,17 @@ class BIOSTREE:
                 LastTree.NextRel = newNode
                 newNode.LastRel = LastTree
             else:
-                newNode.NextRel = self.Child[pos-1].NextRel
-                newNode.LastRel = self.Child[pos].LastRel
-                self.Child[pos-1].NextRel = newNode
-                self.Child[pos].LastRel = newNode
+                if pos == 0:
+                    newNode.NextRel = self.Child[0]
+                    self.Child[0].LastRel = newNode
+                elif pos == len(self.Child):
+                    newNode.LastRel = self.Child[-1]
+                    self.Child[-1].NextRel = newNode
+                else:
+                    newNode.NextRel = self.Child[pos-1].NextRel
+                    newNode.LastRel = self.Child[pos].LastRel
+                    self.Child[pos-1].NextRel = newNode
+                    self.Child[pos].LastRel = newNode
                 self.Child.insert(pos, newNode)
         newNode.Parent = self
 
