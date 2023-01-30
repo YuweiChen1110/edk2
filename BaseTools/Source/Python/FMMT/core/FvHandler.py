@@ -150,6 +150,7 @@ class FvHandler:
         self.TargetFfs = TargetFfs
         self.Status = False
         self.Remain_New_Free_Space = 0
+        self.TargetOrder = None
 
     ## Use for Compress the Section Data
     def CompressData(self, TargetTree) -> None:
@@ -486,8 +487,9 @@ class FvHandler:
         logger.debug('Done!')
         return self.Status
 
-    def AddFfs(self) -> bool:
+    def AddFfs(self, TargetOrder=None) -> bool:
         logger.debug('Start Adding Process......')
+        self.TargetOrder = TargetOrder
         # NewFfs parsing will not calculate the PadSize, thus recalculate.
         self.NewFfs.Data.PadData = b'\xff' * GetPadSize(self.NewFfs.Data.Size, FFS_COMMON_ALIGNMENT)
         if self.TargetFfs.type == FFS_FREE_SPACE:
@@ -505,14 +507,17 @@ class FvHandler:
                 TargetFv.Data.ModExtHeaderData()
                 ModifyFvExtData(TargetFv)
                 TargetFv.Data.ModCheckSum()
-                TargetFv.insertChild(self.NewFfs, -1)
+                if self.TargetOrder != None:
+                    TargetFv.insertChild(self.NewFfs, self.TargetOrder)
+                else:
+                    TargetFv.insertChild(self.NewFfs, -1)
                 ModifyFfsType(self.NewFfs)
                 # Recompress from the Fv node to update all the related node data.
                 self.CompressData(TargetFv)
                 self.Status = True
             elif TargetLen == 0:
                 TargetFv.Child.remove(self.TargetFfs)
-                TargetFv.insertChild(self.NewFfs)
+                TargetFv.insertChild(self.NewFfs, self.TargetOrder)
                 ModifyFfsType(self.NewFfs)
                 # Recompress from the Fv node to update all the related node data.
                 self.CompressData(TargetFv)
@@ -529,11 +534,14 @@ class FvHandler:
                         self.TargetFfs.Data.Data = b'\xff' * New_Add_Len
                         self.TargetFfs.Data.Size = New_Add_Len
                         TargetLen += New_Add_Len
-                        TargetFv.insertChild(self.NewFfs, -1)
+                        if self.TargetOrder != None:
+                            TargetFv.insertChild(self.NewFfs, -1)
+                        else:
+                            TargetFv.insertChild(self.NewFfs, self.TargetOrder)
                         TargetFv.Data.Free_Space = New_Add_Len
                     else:
                         TargetFv.Child.remove(self.TargetFfs)
-                        TargetFv.insertChild(self.NewFfs)
+                        TargetFv.insertChild(self.NewFfs, self.TargetOrder)
                         TargetFv.Data.Free_Space = 0
                     ModifyFfsType(self.NewFfs)
                     ModifyFvSystemGuid(TargetFv)
@@ -571,10 +579,10 @@ class FvHandler:
                     New_Free_Space.Data = FreeSpaceNode(b'\xff' * New_Add_Len)
                     TargetLen += New_Add_Len
                     TargetFv.Data.Free_Space = New_Add_Len
-                    TargetFv.insertChild(self.NewFfs)
+                    TargetFv.insertChild(self.NewFfs, self.TargetOrder)
                     TargetFv.insertChild(New_Free_Space)
                 else:
-                    TargetFv.insertChild(self.NewFfs)
+                    TargetFv.insertChild(self.NewFfs, self.TargetOrder)
                 ModifyFfsType(self.NewFfs)
                 ModifyFvSystemGuid(TargetFv)
                 TargetFv.Data.Data = b''

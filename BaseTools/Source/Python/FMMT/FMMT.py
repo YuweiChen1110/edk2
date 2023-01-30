@@ -28,6 +28,8 @@ parser.add_argument("-e", "--Extract", dest="Extract", nargs='+',
                         If only given TargetFvName, not given TargetFfsName, the TargetFv will be extracted to output file'")
 parser.add_argument("-a", "--Add", dest="Add", nargs='+',
                     help="Add a Ffs into a FV:'-a inputfile TargetFvName newffsfile outputfile'")
+parser.add_argument("-o", "--Order", dest="Order", nargs='+',
+                    help="Target order for the new added Ffs in FV file")
 parser.add_argument("-r", "--Replace", dest="Replace", nargs='+',
                     help="Replace a Ffs in a FV: '-r inputfile TargetFvName(Optional) TargetFfsName newffsfile outputfile\
                         If not given TargetFvName, all the existed target Ffs will be replaced with new Ffs file)'")
@@ -102,9 +104,14 @@ class FMMT():
         else:
             ExtractFfs(inputfile, self.CheckFfsName(Ffs_name), outputfile)
 
-    def Add(self, inputfile: str, Fv_name: str, newffsfile: str, outputfile: str) -> None:
+    def Add(self, inputfile: str, Fv_name: str, newffsfile: str, outputfile: str, order=None) -> None:
         self.SetDestPath(inputfile)
-        AddNewFfs(inputfile, self.CheckFfsName(Fv_name), newffsfile, outputfile)
+        if order != None:
+            print('Here')
+            AddNewFfs(inputfile, self.CheckFfsName(Fv_name), newffsfile, outputfile, order)
+        else:
+            print('There')
+            AddNewFfs(inputfile, self.CheckFfsName(Fv_name), newffsfile, outputfile)
 
     def Replace(self,inputfile: str, Ffs_name: str, newffsfile: str, outputfile: str, Fv_name: str=None) -> None:
         self.SetDestPath(inputfile)
@@ -141,7 +148,10 @@ def main():
             else:
                 fmmt.Extract(args.Extract[0],args.Extract[1],args.Extract[2])
         elif args.Add:
-            fmmt.Add(args.Add[0],args.Add[1],args.Add[2],args.Add[3])
+            if args.Order:
+                fmmt.Add(args.Add[0],args.Add[1],args.Add[2],args.Add[3],int(args.Order[0]))
+            else:
+                fmmt.Add(args.Add[0],args.Add[1],args.Add[2],args.Add[3])
         elif args.Replace:
             if len(args.Replace) == 5:
                 fmmt.Replace(args.Replace[0],args.Replace[2],args.Replace[3],args.Replace[4],args.Replace[1])
