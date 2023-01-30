@@ -58,11 +58,17 @@ class FMMTParser:
         elif rootTree.type == SECTION_TREE:
             # Not compressed section
             if rootTree.Data.OriData == b'' or (rootTree.Data.OriData != b'' and CompressStatus):
-                if rootTree.HasChild():
-                    if rootTree.Data.ExtHeader:
-                        self.FinalData += struct2stream(rootTree.Data.Header) + struct2stream(rootTree.Data.ExtHeader)
-                    else:
-                        self.FinalData += struct2stream(rootTree.Data.Header)
+                if rootTree.HasChild() and rootTree.Data.Type != EFI_SECTION_TE and rootTree.Data.Type != EFI_SECTION_PE32:
+                     if rootTree.Data.ExtHeader:
+                         self.FinalData += struct2stream(rootTree.Data.Header) + struct2stream(rootTree.Data.ExtHeader)
+                     else:
+                         self.FinalData += struct2stream(rootTree.Data.Header)
+                elif rootTree.HasChild() and (rootTree.Data.Type == EFI_SECTION_TE or rootTree.Data.Type == EFI_SECTION_PE32):
+                    self.FinalData += struct2stream(rootTree.Data.Header) + rootTree.Data.Data + rootTree.Data.PadData
+                    rootTree.Child = []
+                    if rootTree.isFinalChild():
+                        ParTree = rootTree.Parent
+                        self.FinalData += ParTree.Data.PadData
                 else:
                     Data = rootTree.Data.Data
                     if rootTree.Data.ExtHeader:

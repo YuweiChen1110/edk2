@@ -107,10 +107,8 @@ class FMMT():
     def Add(self, inputfile: str, Fv_name: str, newffsfile: str, outputfile: str, order=None) -> None:
         self.SetDestPath(inputfile)
         if order != None:
-            print('Here')
             AddNewFfs(inputfile, self.CheckFfsName(Fv_name), newffsfile, outputfile, order)
         else:
-            print('There')
             AddNewFfs(inputfile, self.CheckFfsName(Fv_name), newffsfile, outputfile)
 
     def Replace(self,inputfile: str, Ffs_name: str, newffsfile: str, outputfile: str, Fv_name: str=None) -> None:

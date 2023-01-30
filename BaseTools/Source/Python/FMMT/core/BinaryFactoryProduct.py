@@ -101,6 +101,8 @@ class SectionProduct(BinaryProduct):
             Sec_Fv_Tree.Data.Data = Section_Tree.Data.Data[Sec_Fv_Tree.Data.Header.HeaderLength:]
             Section_Tree.insertChild(Sec_Fv_Tree)
             Fv_count += 1
+        elif Section_Tree.Data.Type == EFI_SECTION_PE32 or Section_Tree.Data.Type == EFI_SECTION_TE:
+            self.ParserPeCoff(Section_Tree, b'')
 
     def ParserSection(self, ParTree, Whole_Data: bytes, Rel_Whole_Offset: int=0) -> None:
         Rel_Offset = 0
@@ -144,6 +146,17 @@ class SectionProduct(BinaryProduct):
             Section_Tree.Data = Section_Info
             ParTree.insertChild(Section_Tree)
 
+    def ParserPeCoff(self, ParTree, Whole_Data: bytes, Rel_Whole_Offset: int=0) -> None:
+        SectionTypeList = [EFI_SECTION_PE32, EFI_SECTION_TE]
+        if ParTree.Data.Type in SectionTypeList:
+            # Find Pe Image
+            PeCoff_Info = PeCoffNode(ParTree.Data.Data, ParTree.Data.DOffset, ParTree.Data.Size-ParTree.Data.HeaderLength)
+            PeCoff_Info.PeCoffRebase()
+            PeCoff_Tree = BIOSTREE(PeCoff_Info.Name)
+            PeCoff_Tree.type = PECOFF_TREE
+            PeCoff_Tree.Data = PeCoff_Info
+            ParTree.insertChild(PeCoff_Tree)
+
 class FfsProduct(BinaryProduct):
     # ParserFFs / GetSection
     def ParserData(self, ParTree, Whole_Data: bytes, Rel_Whole_Offset: int=0) -> None:
@@ -173,17 +186,19 @@ class FfsProduct(BinaryProduct):
             if (Rel_Offset+Section_Info.HeaderLength+len(Section_Info.Data) != Data_Size):
                 Pad_Size = GetPadSize(Section_Info.Size, SECTION_COMMON_ALIGNMENT)
                 Section_Info.PadData = Pad_Size * b'\x00'
-            if Section_Info.Header.Type == 0x02:
+            if Section_Info.Header.Type == EFI_SECTION_GUID_DEFINED:
                 Section_Info.DOffset = Section_Offset + Section_Info.ExtHeader.DataOffset + Rel_Whole_Offset
                 Section_Info.Data = Whole_Data[Rel_Offset+Section_Info.ExtHeader.DataOffset: Rel_Offset+Section_Info.Size]
             # If Section is Version or UI type, it saves the version and UI info of its parent Ffs.
-            if Section_Info.Header.Type == 0x14:
+            if Section_Info.Header.Type == EFI_SECTION_VERSION:
                 ParTree.Data.Version = Section_Info.ExtHeader.GetVersionString()
-            if Section_Info.Header.Type == 0x15:
+            if Section_Info.Header.Type == EFI_SECTION_USER_INTERFACE:
                 ParTree.Data.UiName = Section_Info.ExtHeader.GetUiString()
-            if Section_Info.Header.Type == 0x19:
+            if Section_Info.Header.Type == EFI_SECTION_RAW:
                 if Section_Info.Data.replace(b'\x00', b'') == b'':
                     Section_Info.IsPadSection = True
+            if Section_Info.Header.Type == EFI_SECTION_PE32 or Section_Info.Header.Type == EFI_SECTION_TE:
+                ParTree.Data.PeCoffSecIndex = len(ParTree.Child)
             Section_Offset += Section_Info.Size + Pad_Size
             Rel_Offset += Section_Info.Size + Pad_Size
             Section_Tree.Data = Section_Info
@@ -377,4 +392,4 @@ class ParserEntry():
     def DataParser(self, Tree, Data: bytes, Offset: int) -> None:
         TargetFactory = self.GetTargetFactory(Tree.type)
         if TargetFactory:
-            self.Generate_Product(TargetFactory, Tree, Data, Offset)
+            self.Generate_Product(TargetFactory, Tree, Data, Offset)

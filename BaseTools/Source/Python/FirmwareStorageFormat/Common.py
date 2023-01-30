@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: BSD-2-Clause-Patent
 ##
 from ctypes import *
+from functools import reduce
 import uuid
 
 # ZeroGuid = uuid.UUID('{00000000-0000-0000-0000-000000000000}')
@@ -83,3 +84,13 @@ def GetPadSize(Size: int, alignment: int) -> int:
         return 0
     Pad_Size = alignment - Size % alignment
     return Pad_Size
+
+def Bytes2Val (bytes):
+    return reduce(lambda x,y: (x<<8)|y,  bytes[::-1] )
+
+def Val2Bytes (value, blen):
+    BytesList = [hex((value>>(i*8) & 0xff)) for i in range(blen)]
+    FinalBytes = b''
+    for item in BytesList:
+        FinalBytes += item
+    return FinalBytes

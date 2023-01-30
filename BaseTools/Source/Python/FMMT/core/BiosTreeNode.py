@@ -7,6 +7,7 @@
 from FirmwareStorageFormat.FvHeader import *
 from FirmwareStorageFormat.FfsFileHeader import *
 from FirmwareStorageFormat.SectionHeader import *
+from FirmwareStorageFormat.PECOFFHeader import *
 from FirmwareStorageFormat.Common import *
 from utils.FmmtLogger import FmmtLogger as logger
 import uuid
@@ -129,6 +130,7 @@ class FfsNode:
         self.Data = b''
         self.PadData = b''
         self.SectionMaxAlignment = SECTION_COMMON_ALIGNMENT  # 4-align
+        self.PeCoffSecIndex = None
 
     def ModCheckSum(self) -> None:
         HeaderData = struct2stream(self.Header)
@@ -183,6 +185,148 @@ class SectionNode:
         elif Type == 0x18:
             return EFI_FREEFORM_SUBTYPE_GUID_SECTION.from_buffer_copy(buffer)
 
+class PeCoffNode:
+    def __init__(self, buffer: bytes, offset: int, size: int = 0) -> None:
+        self.Name = 'PeCoff'
+        self.offset = offset
+        self.Size = size
+        self.OriData = buffer
+        self.Data = buffer
+        self.IsTeImage = True
+        self.RelocationsStripped = True
+        self.PeCoffHeaderOffset = 0
+        self.ImageAddress = 0
+        self.DestinationAddress = 0
+        self.DebugDirectoryEntryVirtualAddress = 0
+        self.PeHeader = None
+        self.TeHeader = None
+        self.Machine = None
+        self.ImageType = None
+        self.OptionalHeader = None
+        self.BlkHeaderOffset = 0
+        self.BlkHeader = None
+        self.RelocationsFieldSize = 0
+        self.RelocationsData = None
+        self.RelocList = []
+        self.HOffset = self.offset
+        self.DOffset = 0
+
+        self.TeHeader = EFI_TE_IMAGE_HEADER.from_buffer_copy(self.Data)
+        if self.TeHeader.Signature == EFI_IMAGE_DOS_SIGNATURE:
+            self.IsTeImage = False
+            self.TeHeader = None
+            self.DOffset = 0
+            self.DosHeader = EFI_IMAGE_DOS_HEADER.from_buffer_copy(self.Data)
+            if self.DosHeader.e_magic == EFI_IMAGE_DOS_SIGNATURE:
+                self.PeCoffHeaderOffset = self.DosHeader.e_lfanew
+            self.PeHeader = EFI_IMAGE_OPTIONAL_HEADER_UNION.from_buffer_copy(self.Data[self.PeCoffHeaderOffset:])
+            if self.PeHeader.Pe32.Signature != EFI_IMAGE_NT_SIGNATURE:
+                self.TeHeader =  self.PeHeader.Te
+                if self.TeHeader.Signature != EFI_TE_IMAGE_HEADER_SIGNATURE:
+                    logger.error('Invalid Te Header! Te signature {} is not "VZ".'.format(self.TeHeader.Signature))
+                    raise Exception('Not support TeHeader which signature is not "VZ"!')
+                self.IsTeImage = True
+        self.PeCoffLoaderCheckImageType()
+        self.PeCoffParseReloc()
+
+    def PeCoffLoaderCheckImageType(self) -> None:
+        MachineTypeList = [EFI_IMAGE_FILE_MACHINE_I386, EFI_IMAGE_FILE_MACHINE_EBC, EFI_IMAGE_FILE_MACHINE_X64, EFI_IMAGE_FILE_MACHINE_ARMT, EFI_IMAGE_FILE_MACHINE_ARM64, EFI_IMAGE_FILE_MACHINE_RISCV64]
+        ImageTypeList = [EFI_IMAGE_SUBSYSTEM_EFI_APPLICATION, EFI_IMAGE_SUBSYSTEM_EFI_BOOT_SERVICE_DRIVER, EFI_IMAGE_SUBSYSTEM_EFI_RUNTIME_DRIVER, EFI_IMAGE_SUBSYSTEM_SAL_RUNTIME_DRIVER]
+        # Check Machine Type
+        if self.IsTeImage:
+            self.Machine = self.TeHeader.Machine
+        else:
+            self.Machine = self.PeHeader.Pe32.FileHeader.Machine
+        if self.Machine not in MachineTypeList:
+            if self.Machine == EFI_IMAGE_FILE_MACHINE_ARM:
+                self.Machine = EFI_IMAGE_FILE_MACHINE_ARMT
+                if self.IsTeImage:
+                    self.TeHeader.Machine = self.Machine
+                else:
+                    self.PeHeader.Pe32.FileHeader.Machine = self.Machine
+            else:
+                logger.error('The Machine Type {} is not supported!'.format(self.Machine))
+                raise Exception('The Machine Type {} is not supported!'.format(self.Machine))
+
+        # Check Image Type
+        if self.IsTeImage:
+            self.ImageType = self.TeHeader.Subsystem
+        else:
+            self.ImageType = self.PeHeader.Pe32.OptionalHeader.Subsystem
+        if self.ImageType not in ImageTypeList:
+            logger.error('The Image Type {} is not supported!'.format(self.ImageType))
+            raise Exception('The Image Type {} is not supported!'.format(self.ImageType))
+
+    def PeCoffParseReloc(self) -> None:
+        if self.IsTeImage:
+            self.ImageAddress = self.TeHeader.ImageBase + self.TeHeader.StrippedSize - EFI_TE_IMAGE_HEADER_SIZE
+            self.BlkHeaderOffset = self.offset + EFI_TE_IMAGE_HEADER_SIZE - self.TeHeader.StrippedSize +self.TeHeader.DataDirectory[0].VirtualAddress
+            self.BlkHeader = EFI_BLK_HEADER.from_buffer_copy(self.Data[self.BlkHeaderOffset-self.offset:])
+            self.RelocationsFieldSize = self.BlkHeader.BlockSize - EFI_BLK_HEADER_SIZE
+        else:
+            if self.PeHeader.Pe32.OptionalHeader.Magic == EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC:
+                self.ImageAddress = self.PeHeader.Pe32.OptionalHeader.ImageBase
+            else:
+                self.ImageAddress = self.PeHeader.Pe32Plus.OptionalHeader.ImageBase
+            self.BlkHeaderOffset = self.offset + self.PeCoffHeaderOffset + self.TeHeader.DataDirectory[0].VirtualAddress
+            self.BlkHeader = EFI_BLK_HEADER.from_buffer_copy(self.Data[self.BlkHeaderOffset-self.offset:])
+            self.RelocationsFieldSize = self.BlkHeader.BlockSize - EFI_BLK_HEADER_SIZE
+
+        self.RelocationsData = (c_uint16 * int(self.RelocationsFieldSize/2)).from_buffer_copy(self.Data[self.BlkHeaderOffset - self.offset + EFI_BLK_HEADER_SIZE:self.BlkHeaderOffset - self.offset + EFI_BLK_HEADER_SIZE + self.RelocationsFieldSize])
+
+        for EachDataField in self.RelocationsData:
+            # Rtype [15:12] Roffset [11:0] 
+            EachRType = EachDataField >> 12
+            EachROff = EachDataField & 0xfff
+            if EachRType == 0: # IMAGE_REL_BASED_ABSOLUTE
+                continue
+            if ((EachRType != 3) and (EachRType != 10)): # IMAGE_REL_BASED_HIGHLOW and IMAGE_REL_BASED_DIR64
+                raise Exception("ERROR: Unsupported relocation type %d!" % EachRType)
+            if self.TeHeader:
+                TarROff = self.offset + self.BlkHeader.PageRVA + EachROff + EFI_TE_IMAGE_HEADER_SIZE - self.TeHeader.StrippedSize
+            else:
+                TarROff = self.PeCoffHeaderOffset + self.BlkHeader.PageRVA + EachROff
+            self.RelocList.append((EachRType, TarROff))
+    
+    def PeCoffRebase(self, DeltaSize=0, CalcuFlag=0) -> None:  # if CalcuFlag is set to 0, DeltaSize is a delta address, if set to 1, DeltaSize is a absolute address 
+        if self.TeHeader:
+            CurOff = self.offset + EFI_TE_IMAGE_HEADER.ImageBase.offset
+            ImageBaseSize = EFI_TE_IMAGE_HEADER.ImageBase.size
+            # print('self.TeHeader.DataDirectory[0].VirtualAddress: ', hex(self.TeHeader.DataDirectory[0].VirtualAddress))
+        else:
+            CurOff = self.offset + self.PeCoffHeaderOffset
+            CurOff += EFI_IMAGE_NT_HEADERS32.OptionalHeader.offset
+            if self.PeHeader.Pe32.OptionalHeader.Magic == 0x20b: # PE32+ image
+                CurOff += EFI_IMAGE_OPTIONAL_HEADER64.ImageBase.offset
+                ImageBaseSize = EFI_IMAGE_OPTIONAL_HEADER64.ImageBase.size
+            else:
+                CurOff += EFI_IMAGE_OPTIONAL_HEADER32.ImageBase.offset
+                ImageBaseSize = EFI_IMAGE_OPTIONAL_HEADER32.ImageBase.size
+        # print('CurOff-self.offset', hex(CurOff-self.offset))
+        # print('CurOff-self.offset', hex(CurOff-self.offset+ImageBaseSize))
+        # print('ImageBaseSize', ImageBaseSize)
+        # print('self.Data[CurOff-self.offset:CurOff-self.offset+ImageBaseSize]: ', self.Data[CurOff-self.offset:CurOff-self.offset+ImageBaseSize])
+        if CalcuFlag:
+            CurValue = DeltaSize
+            self.ImageAddress = DeltaSize
+            DeltaSize = DeltaSize - Bytes2Val(self.Data[CurOff-self.offset:CurOff-self.offset+ImageBaseSize])
+        else:
+            self.ImageAddress += DeltaSize
+            CurValue = Bytes2Val(self.Data[CurOff-self.offset:CurOff-self.offset+ImageBaseSize]) + DeltaSize
+        self.Data = self.Data[:CurOff-self.offset] + CurValue.to_bytes(ImageBaseSize, byteorder='little',signed=False) + self.Data[CurOff-self.offset+ImageBaseSize:]
+        
+        ## Rebase function
+        for (EachRType, TarROff) in self.RelocList:
+            if EachRType == 3: # IMAGE_REL_BASED_HIGHLOW
+                CurValue = Bytes2Val(self.Data[TarROff-self.offset:TarROff+4-self.offset])
+                CurValue += DeltaSize
+                self.Data = self.Data[:TarROff-self.offset] + CurValue.to_bytes(4, byteorder='little',signed=False) + self.Data[TarROff+4-self.offset:]
+            elif EachRType == 10: # IMAGE_REL_BASED_DIR64
+                CurValue = Bytes2Val(self.Data[TarROff-self.offset:TarROff+8-self.offset])
+                CurValue += DeltaSize
+                self.Data = self.Data[:TarROff-self.offset] + CurValue.to_bytes(8, byteorder='little',signed=False) + self.Data[TarROff+8-self.offset:]
+
+
 class FreeSpaceNode:
     def __init__(self, buffer: bytes) -> None:
         self.Name = 'Free_Space'
@@ -191,4 +335,4 @@ class FreeSpaceNode:
         self.HOffset = 0
         self.DOffset = 0
         self.ROffset = 0
-        self.PadData = b''
+        self.PadData = b''
