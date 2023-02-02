@@ -261,32 +261,35 @@ class PeCoffNode:
         if self.IsTeImage:
             self.ImageAddress = self.TeHeader.ImageBase + self.TeHeader.StrippedSize - EFI_TE_IMAGE_HEADER_SIZE
             self.BlkHeaderOffset = self.offset + EFI_TE_IMAGE_HEADER_SIZE - self.TeHeader.StrippedSize +self.TeHeader.DataDirectory[0].VirtualAddress
-            self.BlkHeader = EFI_BLK_HEADER.from_buffer_copy(self.Data[self.BlkHeaderOffset-self.offset:])
-            self.RelocationsFieldSize = self.BlkHeader.BlockSize - EFI_BLK_HEADER_SIZE
+            self.BlkSize = self.TeHeader.DataDirectory[0].Size
         else:
             if self.PeHeader.Pe32.OptionalHeader.Magic == EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC:
                 self.ImageAddress = self.PeHeader.Pe32.OptionalHeader.ImageBase
             else:
                 self.ImageAddress = self.PeHeader.Pe32Plus.OptionalHeader.ImageBase
             self.BlkHeaderOffset = self.offset + self.PeCoffHeaderOffset + self.TeHeader.DataDirectory[0].VirtualAddress
-            self.BlkHeader = EFI_BLK_HEADER.from_buffer_copy(self.Data[self.BlkHeaderOffset-self.offset:])
+
+        CurOff = self.BlkHeaderOffset
+        while CurOff < self.BlkHeaderOffset + self.BlkSize:
+            if CurOff % 4:
+                CurOff += 4 - CurOff % 4
+            self.BlkHeader = EFI_BLK_HEADER.from_buffer_copy(self.Data[CurOff-self.offset:])
             self.RelocationsFieldSize = self.BlkHeader.BlockSize - EFI_BLK_HEADER_SIZE
-
-        self.RelocationsData = (c_uint16 * int(self.RelocationsFieldSize/2)).from_buffer_copy(self.Data[self.BlkHeaderOffset - self.offset + EFI_BLK_HEADER_SIZE:self.BlkHeaderOffset - self.offset + EFI_BLK_HEADER_SIZE + self.RelocationsFieldSize])
-
-        for EachDataField in self.RelocationsData:
-            # Rtype [15:12] Roffset [11:0] 
-            EachRType = EachDataField >> 12
-            EachROff = EachDataField & 0xfff
-            if EachRType == 0: # IMAGE_REL_BASED_ABSOLUTE
-                continue
-            if ((EachRType != 3) and (EachRType != 10)): # IMAGE_REL_BASED_HIGHLOW and IMAGE_REL_BASED_DIR64
-                raise Exception("ERROR: Unsupported relocation type %d!" % EachRType)
-            if self.TeHeader:
-                TarROff = self.offset + self.BlkHeader.PageRVA + EachROff + EFI_TE_IMAGE_HEADER_SIZE - self.TeHeader.StrippedSize
-            else:
-                TarROff = self.PeCoffHeaderOffset + self.BlkHeader.PageRVA + EachROff
-            self.RelocList.append((EachRType, TarROff))
+            self.RelocationsData = (c_uint16 * int(self.RelocationsFieldSize/2)).from_buffer_copy(self.Data[CurOff - self.offset + EFI_BLK_HEADER_SIZE:CurOff - self.offset + EFI_BLK_HEADER_SIZE + self.RelocationsFieldSize])
+            for EachDataField in self.RelocationsData:
+                # Rtype [15:12] Roffset [11:0]
+                EachRType = EachDataField >> 12
+                EachROff = EachDataField & 0xfff
+                if EachRType == 0: # IMAGE_REL_BASED_ABSOLUTE
+                    continue
+                if ((EachRType != 3) and (EachRType != 10)): # IMAGE_REL_BASED_HIGHLOW and IMAGE_REL_BASED_DIR64
+                    raise Exception("ERROR: Unsupported relocation type %d!" % EachRType)
+                if self.TeHeader:
+                    TarROff = self.offset + self.BlkHeader.PageRVA + EachROff + EFI_TE_IMAGE_HEADER_SIZE - self.TeHeader.StrippedSize
+                else:
+                    TarROff = self.PeCoffHeaderOffset + self.BlkHeader.PageRVA + EachROff
+                self.RelocList.append((EachRType, TarROff))
+            CurOff += self.BlkHeader.BlockSize
     
     def PeCoffRebase(self, DeltaSize=0, CalcuFlag=0) -> None:  # if CalcuFlag is set to 0, DeltaSize is a delta address, if set to 1, DeltaSize is a absolute address 
         if self.TeHeader:
