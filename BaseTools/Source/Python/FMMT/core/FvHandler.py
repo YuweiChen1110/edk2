@@ -519,21 +519,21 @@ class FvHandler:
                 else:
                     TargetFv.insertChild(self.NewFfs, -1)
                 ModifyFfsType(self.NewFfs)
-                # Recompress from the Fv node to update all the related node data.
-                self.CompressData(TargetFv)
                 RebaseSize = self.GetRebaseSize(self.NewFfs)
                 CalcuFlag = 1
                 self.RebaseFfs(self.NewFfs, RebaseSize, CalcuFlag)
+                # Recompress from the Fv node to update all the related node data.
+                self.CompressData(TargetFv)
                 self.Status = True
             elif TargetLen == 0:
                 TargetFv.Child.remove(self.TargetFfs)
                 TargetFv.insertChild(self.NewFfs, self.TargetOrder)
                 ModifyFfsType(self.NewFfs)
-                # Recompress from the Fv node to update all the related node data.
-                self.CompressData(TargetFv)
                 RebaseSize = self.GetRebaseSize(self.NewFfs)
                 CalcuFlag = 1
                 self.RebaseFfs(self.NewFfs, RebaseSize, CalcuFlag)
+                # Recompress from the Fv node to update all the related node data.
+                self.CompressData(TargetFv)
                 self.Status = True
             # If TargetFv do not have enough free space, need move part of the free space of TargetFv's parent Fv to TargetFv/NewFfs.
             else:
@@ -707,32 +707,31 @@ class FvHandler:
 
     def GetRebaseSize(self, TargetFfs)->int:
         RebaseSize = 0
+        FfsDataOffset = 0
+        SecOffset = 0
         if TargetFfs.Data.PeCoffSecIndex != None:
             TargetFv = TargetFfs.Parent
             TargetFfsIndex = TargetFv.Child.index(TargetFfs)
-            for Index in range(TargetFfsIndex-1, -1, -1):
-                CurFfs = TargetFv.Child[Index]
-                if CurFfs.Data.PeCoffSecIndex:
-                    OriImageBase = CurFfs.Child[CurFfs.Data.PeCoffSecIndex].Child[0].Data.ImageAddress
-                    CalSize = 0
-                    ChildNum = len(CurFfs.Child)
-                    for CalIndex in range(CurFfs.Data.PeCoffSecIndex, ChildNum):
-                        CalSize += CurFfs.Child[CalIndex].Data.Size + len(CurFfs.Child[CalIndex].Data.PadData)
-                    for CalIndex in range(Index, TargetFfsIndex):
-                        if CalIndex == Index:
-                            CalSize += len(TargetFv.Child[CalIndex].Data.PadData)
-                        else:
-                            CalSize += TargetFv.Child[CalIndex].Data.Size + len(TargetFv.Child[CalIndex].Data.PadData)
-                    for CalIndex in range(TargetFfs.Data.PeCoffSecIndex):
-                        CalSize += TargetFfs.Child[CalIndex].Data.Size + len(TargetFfs.Child[CalIndex].Data.PadData)                    
-                    RebaseSize = OriImageBase + CalSize
-                    break
+            BaseAddress = TargetFv.Data.BaseAddress
+            TarSecNode = TargetFfs.Child[TargetFfs.Data.PeCoffSecIndex]
+            TarPeCoffNode = TarSecNode.Child[0]
+            for CalIndex in range(TargetFfsIndex):
+                FfsDataOffset += TargetFv.Child[CalIndex].Data.Size + len(TargetFv.Child[CalIndex].Data.PadData)
+            for CalIndex in range(TargetFfs.Data.PeCoffSecIndex):
+                SecOffset += TargetFfs.Child[CalIndex].Data.Size + len(TargetFfs.Child[CalIndex].Data.PadData)
+            if TarPeCoffNode.Data.TeHeader:
+                RebaseSize = BaseAddress + TargetFv.Data.HeaderLength + FfsDataOffset + TargetFfs.Data.HeaderLength + SecOffset + \
+                            TarSecNode.Data.HeaderLength + EFI_TE_IMAGE_HEADER_SIZE - TarPeCoffNode.Data.TeHeader.StrippedSize
+            elif TarPeCoffNode.Data.PeHeader:
+                RebaseSize = BaseAddress + TargetFv.Data.HeaderLength + FfsDataOffset + TargetFfs.Data.HeaderLength + SecOffset + \
+                            TarSecNode.Data.HeaderLength
         return RebaseSize
 
     def RebaseFfs(self, TargetFfs, RebaseSize, CalcuFlag=0) -> None:
         TargetFv = TargetFfs.Parent
         Target_Index = TargetFv.Child.index(TargetFfs)
         ChildFfsNum = len(TargetFv.Child)
+        NewAddedOffset = TargetFfs.Data.Size + len(TargetFfs.Data.PadData)
         for RebaseFfsIndex in range(Target_Index, ChildFfsNum, 1):
             CurTargetFfs = TargetFv.Child[RebaseFfsIndex]
             if CurTargetFfs.type == FFS_FREE_SPACE:
@@ -754,5 +753,5 @@ class FvHandler:
                 elif EachSection.type == SECTION_TREE:
                     CurTargetFfs.Data.Data += struct2stream(EachSection.Data.Header) + EachSection.Data.Data + EachSection.Data.PadData
             if CurTargetFfs.NextRel:
-                CalcuFlag = 1
-                RebaseSize = self.GetRebaseSize(CurTargetFfs.NextRel)
+                CalcuFlag = 0
+                RebaseSize = NewAddedOffset

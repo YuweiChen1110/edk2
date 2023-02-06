@@ -195,6 +195,16 @@ class FfsProduct(BinaryProduct):
             if Section_Info.Header.Type == EFI_SECTION_USER_INTERFACE:
                 ParTree.Data.UiName = Section_Info.ExtHeader.GetUiString()
             if Section_Info.Header.Type == EFI_SECTION_RAW:
+                if ParTree.Data.IsFsp:
+                    ParTree.Parent.Data.ImageSize = Bytes2Val(Section_Info.Data[24:28])
+                    ParTree.Parent.Data.BaseAddress = Bytes2Val(Section_Info.Data[28:32])
+                elif ParTree.Data.IsVtf:
+                    TargetFv = ParTree.Parent
+                    offset = 0
+                    while TargetFv:
+                        offset += TargetFv.Data.Size
+                        TargetFv = TargetFv.NextRel
+                    ParTree.Parent.Data.BaseAddress = 0x100000000 - offset
                 if Section_Info.Data.replace(b'\x00', b'') == b'':
                     Section_Info.IsPadSection = True
             if Section_Info.Header.Type == EFI_SECTION_PE32 or Section_Info.Header.Type == EFI_SECTION_TE:

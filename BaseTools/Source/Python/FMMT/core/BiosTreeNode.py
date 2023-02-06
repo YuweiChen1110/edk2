@@ -77,6 +77,8 @@ class FvNode:
         self.PadData = b''
         self.Free_Space = 0
         self.ModCheckSum()
+        self.ImageSize = None
+        self.BaseAddress = None
 
     def ModCheckSum(self) -> None:
         # Fv Header Sums to 0.
@@ -131,6 +133,10 @@ class FfsNode:
         self.PadData = b''
         self.SectionMaxAlignment = SECTION_COMMON_ALIGNMENT  # 4-align
         self.PeCoffSecIndex = None
+        self.IsFsp = False
+        self.IsVtf = False
+        self.IfFsp()
+        self.IfVtf()
 
     def ModCheckSum(self) -> None:
         HeaderData = struct2stream(self.Header)
@@ -142,6 +148,14 @@ class FfsNode:
         if HeaderSum & 0xff:
             Header = self.Header.IntegrityCheck.Checksum.Header + 0x100 - HeaderSum % 0x100
             self.Header.IntegrityCheck.Checksum.Header = Header % 0x100
+
+    def IfFsp(self) -> None:
+        if self.Name == EFI_FSP_GUID:
+            self.IsFsp = True
+
+    def IfVtf(self) -> None:
+        if self.Name == EFI_FFS_VOLUME_TOP_FILE_GUID:
+            self.IsVtf = True
 
 class SectionNode:
     def __init__(self, buffer: bytes) -> None:
@@ -299,25 +313,41 @@ class PeCoffNode:
         else:
             CurOff = self.offset + self.PeCoffHeaderOffset
             CurOff += EFI_IMAGE_NT_HEADERS32.OptionalHeader.offset
-            if self.PeHeader.Pe32.OptionalHeader.Magic == 0x20b: # PE32+ image
+            if self.PeHeader.Pe32.OptionalHeader.Magic == EFI_IMAGE_NT_OPTIONAL_HDR64_MAGIC: # PE32+ image
                 CurOff += EFI_IMAGE_OPTIONAL_HEADER64.ImageBase.offset
                 ImageBaseSize = EFI_IMAGE_OPTIONAL_HEADER64.ImageBase.size
             else:
                 CurOff += EFI_IMAGE_OPTIONAL_HEADER32.ImageBase.offset
                 ImageBaseSize = EFI_IMAGE_OPTIONAL_HEADER32.ImageBase.size
-        # print('CurOff-self.offset', hex(CurOff-self.offset))
-        # print('CurOff-self.offset', hex(CurOff-self.offset+ImageBaseSize))
-        # print('ImageBaseSize', ImageBaseSize)
-        # print('self.Data[CurOff-self.offset:CurOff-self.offset+ImageBaseSize]: ', self.Data[CurOff-self.offset:CurOff-self.offset+ImageBaseSize])
         if CalcuFlag:
-            CurValue = DeltaSize
-            self.ImageAddress = DeltaSize
-            DeltaSize = DeltaSize - Bytes2Val(self.Data[CurOff-self.offset:CurOff-self.offset+ImageBaseSize])
+            NewImageBase = DeltaSize
+            if self.TeHeader:
+                DeltaSize = DeltaSize - self.TeHeader.ImageBase
+                self.TeHeader.ImageBase = NewImageBase
+                self.ImageAddress = self.TeHeader.ImageBase + self.TeHeader.StrippedSize - EFI_TE_IMAGE_HEADER_SIZE
+            else:
+                DeltaSize = DeltaSize - self.ImageAddress
+                if self.PeHeader.Pe32.OptionalHeader.Magic == EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC:
+                    self.PeHeader.Pe32.OptionalHeader.ImageBase = NewImageBase
+                    self.ImageAddress = self.PeHeader.Pe32.OptionalHeader.ImageBase
+                else:
+                    self.PeHeader.Pe32Plus.OptionalHeader.ImageBase = NewImageBase
+                    self.ImageAddress = self.PeHeader.Pe32Plus.OptionalHeader.ImageBase
+            CurValue = NewImageBase
         else:
-            self.ImageAddress += DeltaSize
+            if self.TeHeader:
+                self.TeHeader.ImageBase += DeltaSize
+                self.ImageAddress = self.TeHeader.ImageBase + self.TeHeader.StrippedSize - EFI_TE_IMAGE_HEADER_SIZE
+            else:
+                if self.PeHeader.Pe32.OptionalHeader.Magic == EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC:
+                    self.PeHeader.Pe32.OptionalHeader.ImageBase += DeltaSize
+                    self.ImageAddress = self.PeHeader.Pe32.OptionalHeader.ImageBase
+                else:
+                    self.PeHeader.Pe32Plus.OptionalHeader.ImageBase += DeltaSize
+                    self.ImageAddress = self.PeHeader.Pe32Plus.OptionalHeader.ImageBase
             CurValue = Bytes2Val(self.Data[CurOff-self.offset:CurOff-self.offset+ImageBaseSize]) + DeltaSize
         self.Data = self.Data[:CurOff-self.offset] + CurValue.to_bytes(ImageBaseSize, byteorder='little',signed=False) + self.Data[CurOff-self.offset+ImageBaseSize:]
-        
+
         ## Rebase function
         for (EachRType, TarROff) in self.RelocList:
             if EachRType == 3: # IMAGE_REL_BASED_HIGHLOW
