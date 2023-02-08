@@ -297,6 +297,7 @@ class PeCoffNode:
                 if EachRType == 0: # IMAGE_REL_BASED_ABSOLUTE
                     continue
                 if ((EachRType != 3) and (EachRType != 10)): # IMAGE_REL_BASED_HIGHLOW and IMAGE_REL_BASED_DIR64
+                    logger.error("ERROR: Unsupported relocation type %d!" % EachRType)
                     raise Exception("ERROR: Unsupported relocation type %d!" % EachRType)
                 if self.TeHeader:
                     TarROff = self.offset + self.BlkHeader.PageRVA + EachROff + EFI_TE_IMAGE_HEADER_SIZE - self.TeHeader.StrippedSize
@@ -307,6 +308,7 @@ class PeCoffNode:
     
     def PeCoffRebase(self, DeltaSize=0, CalcuFlag=0) -> None:  # if CalcuFlag is set to 0, DeltaSize is a delta address, if set to 1, DeltaSize is a absolute address 
         if self.TeHeader:
+            ImageBase = self.TeHeader.ImageBase
             CurOff = self.offset + EFI_TE_IMAGE_HEADER.ImageBase.offset
             ImageBaseSize = EFI_TE_IMAGE_HEADER.ImageBase.size
             # print('self.TeHeader.DataDirectory[0].VirtualAddress: ', hex(self.TeHeader.DataDirectory[0].VirtualAddress))
@@ -314,9 +316,11 @@ class PeCoffNode:
             CurOff = self.offset + self.PeCoffHeaderOffset
             CurOff += EFI_IMAGE_NT_HEADERS32.OptionalHeader.offset
             if self.PeHeader.Pe32.OptionalHeader.Magic == EFI_IMAGE_NT_OPTIONAL_HDR64_MAGIC: # PE32+ image
+                ImageBase = EFI_IMAGE_OPTIONAL_HEADER64.ImageBase
                 CurOff += EFI_IMAGE_OPTIONAL_HEADER64.ImageBase.offset
                 ImageBaseSize = EFI_IMAGE_OPTIONAL_HEADER64.ImageBase.size
             else:
+                ImageBase = EFI_IMAGE_OPTIONAL_HEADER32.ImageBase
                 CurOff += EFI_IMAGE_OPTIONAL_HEADER32.ImageBase.offset
                 ImageBaseSize = EFI_IMAGE_OPTIONAL_HEADER32.ImageBase.size
         if CalcuFlag:
@@ -338,6 +342,7 @@ class PeCoffNode:
             if self.TeHeader:
                 self.TeHeader.ImageBase += DeltaSize
                 self.ImageAddress = self.TeHeader.ImageBase + self.TeHeader.StrippedSize - EFI_TE_IMAGE_HEADER_SIZE
+                CurValue = self.TeHeader.ImageBase
             else:
                 if self.PeHeader.Pe32.OptionalHeader.Magic == EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC:
                     self.PeHeader.Pe32.OptionalHeader.ImageBase += DeltaSize
@@ -345,7 +350,7 @@ class PeCoffNode:
                 else:
                     self.PeHeader.Pe32Plus.OptionalHeader.ImageBase += DeltaSize
                     self.ImageAddress = self.PeHeader.Pe32Plus.OptionalHeader.ImageBase
-            CurValue = Bytes2Val(self.Data[CurOff-self.offset:CurOff-self.offset+ImageBaseSize]) + DeltaSize
+                CurValue = self.ImageAddress
         self.Data = self.Data[:CurOff-self.offset] + CurValue.to_bytes(ImageBaseSize, byteorder='little',signed=False) + self.Data[CurOff-self.offset+ImageBaseSize:]
 
         ## Rebase function
@@ -358,7 +363,6 @@ class PeCoffNode:
                 CurValue = Bytes2Val(self.Data[TarROff-self.offset:TarROff+8-self.offset])
                 CurValue += DeltaSize
                 self.Data = self.Data[:TarROff-self.offset] + CurValue.to_bytes(8, byteorder='little',signed=False) + self.Data[TarROff+8-self.offset:]
-
 
 class FreeSpaceNode:
     def __init__(self, buffer: bytes) -> None:

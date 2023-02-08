@@ -10,7 +10,9 @@
 # Import Modules
 #
 import argparse
+import time
 from core.FMMTOperation import *
+from utils.FmmtLogger import FmmtLogger as logger
 
 parser = argparse.ArgumentParser(description='''
 View the Binary Structure of FD/FV/Ffs/Section, and Delete/Extract/Add/Replace a Ffs from/into a FV.
@@ -123,8 +125,10 @@ class FMMT():
         ShrinkFv(inputfile, outputfile)
 
 def main():
+    starttime = time.time()
     args=parser.parse_args()
     status=0
+    logger.info("This FMMT action may take minutes, please wait...")
 
     try:
         fmmt=FMMT()
@@ -161,6 +165,9 @@ def main():
             parser.print_help()
     except Exception as e:
         print(e)
+    endtime = time.time()
+    logger.info("The FMMT action is done successfully!")
+    logger.info("Total spend time: %s s" % (endtime - starttime))
 
     return status
 
