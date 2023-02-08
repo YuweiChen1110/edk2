@@ -399,6 +399,9 @@ class FvHandler:
                 Target_index = TargetFv.Child.index(self.TargetFfs)
                 TargetFv.Child.remove(self.TargetFfs)
                 TargetFv.insertChild(self.NewFfs, Target_index)
+                RebaseSize = self.GetRebaseSize(self.NewFfs)
+                CalcuFlag = 1
+                self.RebaseFfs(self.NewFfs, RebaseSize, CalcuFlag)
                 # Modify TargetFv Header and ExtHeader info.
                 TargetFv.Data.ModFvExt()
                 TargetFv.Data.ModFvSize()
@@ -416,6 +419,9 @@ class FvHandler:
                 Target_index = TargetFv.Child.index(self.TargetFfs)
                 TargetFv.Child.remove(self.TargetFfs)
                 TargetFv.insertChild(self.NewFfs, Target_index)
+                RebaseSize = self.GetRebaseSize(self.NewFfs)
+                CalcuFlag = 1
+                self.RebaseFfs(self.NewFfs, RebaseSize, CalcuFlag)
                 # Modify TargetFv Header and ExtHeader info.
                 TargetFv.Data.ModFvExt()
                 TargetFv.Data.ModFvSize()
@@ -446,6 +452,9 @@ class FvHandler:
                         TargetFv.Child.remove(self.TargetFfs)
                         TargetFv.Data.Free_Space = 0
                         TargetFv.insertChild(self.NewFfs)
+                    RebaseSize = self.GetRebaseSize(self.NewFfs)
+                    CalcuFlag = 1
+                    self.RebaseFfs(self.NewFfs, RebaseSize, CalcuFlag)
                     # Encapsulate the Fv Data for update.
                     TargetFv.Data.Data = b''
                     for item in TargetFv.Child:
@@ -482,6 +491,9 @@ class FvHandler:
                 Target_index = TargetFv.Child.index(self.TargetFfs)
                 TargetFv.Child.remove(self.TargetFfs)
                 TargetFv.insertChild(self.NewFfs, Target_index)
+            RebaseSize = self.GetRebaseSize(self.NewFfs)
+            CalcuFlag = 1
+            self.RebaseFfs(self.NewFfs, RebaseSize, CalcuFlag)
             # Modify TargetFv Header and ExtHeader info.
             TargetFv.Data.ModFvExt()
             TargetFv.Data.ModFvSize()
@@ -666,7 +678,17 @@ class FvHandler:
             New_Ffs_Tree.Data = New_Free_Space_Info
             Delete_Fv.insertChild(New_Ffs_Tree)
             Delete_Fv.Data.Free_Space = Add_Free_Space
+        IfRebase = False
+        while Delete_Ffs.NextRel:
+            CurFfs = Delete_Ffs.NextRel
+            if CurFfs.Data.PeCoffSecIndex != None:
+                IfRebase = True
+                break
         Delete_Fv.Child.remove(Delete_Ffs)
+        if IfRebase:
+            RebaseSize = self.GetRebaseSize(CurFfs)
+            CalcuFlag = 1
+            self.RebaseFfs(CurFfs, RebaseSize, CalcuFlag)
         Delete_Fv.Data.Header.FvLength = Used_Size + New_Free_Space
         Delete_Fv.Data.ModFvExt()
         Delete_Fv.Data.ModFvSize()
