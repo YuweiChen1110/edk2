@@ -279,9 +279,12 @@ class PeCoffNode:
         else:
             if self.PeHeader.Pe32.OptionalHeader.Magic == EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC:
                 self.ImageAddress = self.PeHeader.Pe32.OptionalHeader.ImageBase
+                self.BlkHeaderOffset = self.offset + self.PeCoffHeaderOffset + self.PeHeader.Pe32.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC].VirtualAddress
+                self.BlkSize = self.PeHeader.Pe32.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC].Size
             else:
                 self.ImageAddress = self.PeHeader.Pe32Plus.OptionalHeader.ImageBase
-            self.BlkHeaderOffset = self.offset + self.PeCoffHeaderOffset + self.TeHeader.DataDirectory[0].VirtualAddress
+                self.BlkHeaderOffset = self.offset + self.PeCoffHeaderOffset + self.PeHeader.Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC].VirtualAddress
+                self.BlkSize = self.PeHeader.Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC].Size
 
         CurOff = self.BlkHeaderOffset
         while CurOff < self.BlkHeaderOffset + self.BlkSize:
@@ -311,7 +314,6 @@ class PeCoffNode:
             ImageBase = self.TeHeader.ImageBase
             CurOff = self.offset + EFI_TE_IMAGE_HEADER.ImageBase.offset
             ImageBaseSize = EFI_TE_IMAGE_HEADER.ImageBase.size
-            # print('self.TeHeader.DataDirectory[0].VirtualAddress: ', hex(self.TeHeader.DataDirectory[0].VirtualAddress))
         else:
             CurOff = self.offset + self.PeCoffHeaderOffset
             CurOff += EFI_IMAGE_NT_HEADERS32.OptionalHeader.offset
