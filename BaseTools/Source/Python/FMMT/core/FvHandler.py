@@ -731,49 +731,51 @@ class FvHandler:
         RebaseSize = 0
         FfsDataOffset = 0
         SecOffset = 0
-        if TargetFfs.Data.PeCoffSecIndex != None:
-            TargetFv = TargetFfs.Parent
-            TargetFfsIndex = TargetFv.Child.index(TargetFfs)
-            BaseAddress = TargetFv.Data.BaseAddress
-            TarSecNode = TargetFfs.Child[TargetFfs.Data.PeCoffSecIndex]
-            TarPeCoffNode = TarSecNode.Child[0]
-            for CalIndex in range(TargetFfsIndex):
-                FfsDataOffset += TargetFv.Child[CalIndex].Data.Size + len(TargetFv.Child[CalIndex].Data.PadData)
-            for CalIndex in range(TargetFfs.Data.PeCoffSecIndex):
-                SecOffset += TargetFfs.Child[CalIndex].Data.Size + len(TargetFfs.Child[CalIndex].Data.PadData)
-            if TarPeCoffNode.Data.TeHeader:
-                RebaseSize = BaseAddress + TargetFv.Data.HeaderLength + FfsDataOffset + TargetFfs.Data.HeaderLength + SecOffset + \
-                            TarSecNode.Data.HeaderLength + EFI_TE_IMAGE_HEADER_SIZE - TarPeCoffNode.Data.TeHeader.StrippedSize
-            elif TarPeCoffNode.Data.PeHeader:
-                RebaseSize = BaseAddress + TargetFv.Data.HeaderLength + FfsDataOffset + TargetFfs.Data.HeaderLength + SecOffset + \
-                            TarSecNode.Data.HeaderLength
+        if TargetFfs.Parent.Data.type == FV_TREE or TargetFfs.Parent.Data.type == ROOT_FV_TREE:
+            if TargetFfs.Data.PeCoffSecIndex != None:
+                TargetFv = TargetFfs.Parent
+                TargetFfsIndex = TargetFv.Child.index(TargetFfs)
+                BaseAddress = TargetFv.Data.BaseAddress
+                TarSecNode = TargetFfs.Child[TargetFfs.Data.PeCoffSecIndex]
+                TarPeCoffNode = TarSecNode.Child[0]
+                for CalIndex in range(TargetFfsIndex):
+                    FfsDataOffset += TargetFv.Child[CalIndex].Data.Size + len(TargetFv.Child[CalIndex].Data.PadData)
+                for CalIndex in range(TargetFfs.Data.PeCoffSecIndex):
+                    SecOffset += TargetFfs.Child[CalIndex].Data.Size + len(TargetFfs.Child[CalIndex].Data.PadData)
+                if TarPeCoffNode.Data.TeHeader:
+                    RebaseSize = BaseAddress + TargetFv.Data.HeaderLength + FfsDataOffset + TargetFfs.Data.HeaderLength + SecOffset + \
+                                TarSecNode.Data.HeaderLength + EFI_TE_IMAGE_HEADER_SIZE - TarPeCoffNode.Data.TeHeader.StrippedSize
+                elif TarPeCoffNode.Data.PeHeader:
+                    RebaseSize = BaseAddress + TargetFv.Data.HeaderLength + FfsDataOffset + TargetFfs.Data.HeaderLength + SecOffset + \
+                                TarSecNode.Data.HeaderLength
         return RebaseSize
 
     def RebaseFfs(self, TargetFfs, RebaseSize, CalcuFlag=0) -> None:
         TargetFv = TargetFfs.Parent
-        Target_Index = TargetFv.Child.index(TargetFfs)
-        ChildFfsNum = len(TargetFv.Child)
-        NewAddedOffset = TargetFfs.Data.Size + len(TargetFfs.Data.PadData)
-        for RebaseFfsIndex in range(Target_Index, ChildFfsNum, 1):
-            CurTargetFfs = TargetFv.Child[RebaseFfsIndex]
-            if CurTargetFfs.type == FFS_FREE_SPACE:
-                break
-            CurTargetFfs.Data.Data = b''
-            for EachSection in CurTargetFfs.Child:
-                if EachSection.Data.Type == EFI_SECTION_PE32 or EachSection.Data.Type == EFI_SECTION_TE:
-                    if EachSection.Child and EachSection.Child[0].type==PECOFF_TREE:
-                        PeCoffTree = EachSection.Child[0]
-                        PeCoffTree.Data.PeCoffRebase(RebaseSize, CalcuFlag)
-                        EachSection.Data.Data = PeCoffTree.Data.Data
-                        CurTargetFfs.Data.Data += struct2stream(EachSection.Data.Header) + PeCoffTree.Data.Data
-                elif EachSection.type == SECTION_TREE and not EachSection.Data.OriData and EachSection.Data.ExtHeader:
-                    CurTargetFfs.Data.Data += struct2stream(EachSection.Data.Header) + struct2stream(EachSection.Data.ExtHeader) + EachSection.Data.Data + EachSection.Data.PadData
-                elif EachSection.type == SECTION_TREE and EachSection.Data.OriData and not EachSection.Data.ExtHeader:
-                    CurTargetFfs.Data.Data += struct2stream(EachSection.Data.Header) + EachSection.Data.OriData + EachSection.Data.PadData
-                elif EachSection.type == SECTION_TREE and EachSection.Data.OriData and EachSection.Data.ExtHeader:
-                    CurTargetFfs.Data.Data += struct2stream(EachSection.Data.Header) + struct2stream(EachSection.Data.ExtHeader) + EachSection.Data.OriData + EachSection.Data.PadData
-                elif EachSection.type == SECTION_TREE:
-                    CurTargetFfs.Data.Data += struct2stream(EachSection.Data.Header) + EachSection.Data.Data + EachSection.Data.PadData
-            if CurTargetFfs.NextRel:
-                CalcuFlag = 0
-                RebaseSize = NewAddedOffset
+        if TargetFv.type == FV_TREE or TargetFv.type == ROOT_FV_TREE:
+            Target_Index = TargetFv.Child.index(TargetFfs)
+            ChildFfsNum = len(TargetFv.Child)
+            NewAddedOffset = TargetFfs.Data.Size + len(TargetFfs.Data.PadData)
+            for RebaseFfsIndex in range(Target_Index, ChildFfsNum, 1):
+                CurTargetFfs = TargetFv.Child[RebaseFfsIndex]
+                if CurTargetFfs.type == FFS_FREE_SPACE:
+                    break
+                CurTargetFfs.Data.Data = b''
+                for EachSection in CurTargetFfs.Child:
+                    if EachSection.Data.Type == EFI_SECTION_PE32 or EachSection.Data.Type == EFI_SECTION_TE:
+                        if EachSection.Child and EachSection.Child[0].type==PECOFF_TREE:
+                            PeCoffTree = EachSection.Child[0]
+                            PeCoffTree.Data.PeCoffRebase(RebaseSize, CalcuFlag)
+                            EachSection.Data.Data = PeCoffTree.Data.Data
+                            CurTargetFfs.Data.Data += struct2stream(EachSection.Data.Header) + PeCoffTree.Data.Data
+                    elif EachSection.type == SECTION_TREE and not EachSection.Data.OriData and EachSection.Data.ExtHeader:
+                        CurTargetFfs.Data.Data += struct2stream(EachSection.Data.Header) + struct2stream(EachSection.Data.ExtHeader) + EachSection.Data.Data + EachSection.Data.PadData
+                    elif EachSection.type == SECTION_TREE and EachSection.Data.OriData and not EachSection.Data.ExtHeader:
+                        CurTargetFfs.Data.Data += struct2stream(EachSection.Data.Header) + EachSection.Data.OriData + EachSection.Data.PadData
+                    elif EachSection.type == SECTION_TREE and EachSection.Data.OriData and EachSection.Data.ExtHeader:
+                        CurTargetFfs.Data.Data += struct2stream(EachSection.Data.Header) + struct2stream(EachSection.Data.ExtHeader) + EachSection.Data.OriData + EachSection.Data.PadData
+                    elif EachSection.type == SECTION_TREE:
+                        CurTargetFfs.Data.Data += struct2stream(EachSection.Data.Header) + EachSection.Data.Data + EachSection.Data.PadData
+                if CurTargetFfs.NextRel:
+                    CalcuFlag = 0
+                    RebaseSize = NewAddedOffset
