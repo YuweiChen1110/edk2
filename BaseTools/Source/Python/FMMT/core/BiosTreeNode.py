@@ -279,11 +279,11 @@ class PeCoffNode:
         else:
             if self.PeHeader.Pe32.OptionalHeader.Magic == EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC:
                 self.ImageAddress = self.PeHeader.Pe32.OptionalHeader.ImageBase
-                self.BlkHeaderOffset = self.offset + self.PeCoffHeaderOffset + self.PeHeader.Pe32.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC].VirtualAddress
+                self.BlkHeaderOffset = self.offset + self.PeHeader.Pe32.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC].VirtualAddress
                 self.BlkSize = self.PeHeader.Pe32.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC].Size
             else:
                 self.ImageAddress = self.PeHeader.Pe32Plus.OptionalHeader.ImageBase
-                self.BlkHeaderOffset = self.offset + self.PeCoffHeaderOffset + self.PeHeader.Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC].VirtualAddress
+                self.BlkHeaderOffset = self.offset + self.PeHeader.Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC].VirtualAddress
                 self.BlkSize = self.PeHeader.Pe32Plus.OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC].Size
 
         CurOff = self.BlkHeaderOffset
@@ -305,7 +305,7 @@ class PeCoffNode:
                 if self.TeHeader:
                     TarROff = self.offset + self.BlkHeader.PageRVA + EachROff + EFI_TE_IMAGE_HEADER_SIZE - self.TeHeader.StrippedSize
                 else:
-                    TarROff = self.PeCoffHeaderOffset + self.BlkHeader.PageRVA + EachROff
+                    TarROff = self.offset + self.BlkHeader.PageRVA + EachROff
                 self.RelocList.append((EachRType, TarROff))
             CurOff += self.BlkHeader.BlockSize
     
