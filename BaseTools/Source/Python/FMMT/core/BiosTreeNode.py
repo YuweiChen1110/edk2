@@ -222,8 +222,10 @@ class PeCoffNode:
         self.RelocationsFieldSize = 0
         self.RelocationsData = None
         self.RelocList = []
+        self.SizeOfImage = 0
         self.HOffset = self.offset
         self.DOffset = 0
+        self.IfRebase = True
 
         self.TeHeader = EFI_TE_IMAGE_HEADER.from_buffer_copy(self.Data)
         if self.TeHeader.Signature == EFI_IMAGE_DOS_SIGNATURE:
@@ -241,7 +243,9 @@ class PeCoffNode:
                     raise Exception('Not support TeHeader which signature is not "VZ"!')
                 self.IsTeImage = True
         self.PeCoffLoaderCheckImageType()
-        self.PeCoffParseReloc()
+        self.PeCoffRebaseFlag()
+        if self.IfRebase:
+            self.PeCoffParseReloc()
 
     def PeCoffLoaderCheckImageType(self) -> None:
         MachineTypeList = [EFI_IMAGE_FILE_MACHINE_I386, EFI_IMAGE_FILE_MACHINE_EBC, EFI_IMAGE_FILE_MACHINE_X64, EFI_IMAGE_FILE_MACHINE_ARMT, EFI_IMAGE_FILE_MACHINE_ARM64, EFI_IMAGE_FILE_MACHINE_RISCV64]
@@ -270,6 +274,17 @@ class PeCoffNode:
         if self.ImageType not in ImageTypeList:
             logger.error('The Image Type {} is not supported!'.format(self.ImageType))
             raise Exception('The Image Type {} is not supported!'.format(self.ImageType))
+
+    def PeCoffRebaseFlag(self):
+        if self.IsTeImage:
+            pass
+        else:
+            if self.PeHeader.Pe32.OptionalHeader.Magic == EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC:
+                self.SizeOfImage = self.PeHeader.Pe32.OptionalHeader.SizeOfImage
+            else:
+                self.SizeOfImage = self.PeHeader.Pe32Plus.OptionalHeader.SizeOfImage
+            if self.SizeOfImage != len(self.Data):
+                self.IfRebase = False
 
     def PeCoffParseReloc(self) -> None:
         if self.IsTeImage:

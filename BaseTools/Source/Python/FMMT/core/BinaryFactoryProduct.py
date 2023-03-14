@@ -152,7 +152,8 @@ class SectionProduct(BinaryProduct):
         if ParTree.Data.Type in SectionTypeList:
             # Find Pe Image
             PeCoff_Info = PeCoffNode(ParTree.Data.Data, ParTree.Data.DOffset, ParTree.Data.Size-ParTree.Data.HeaderLength)
-            PeCoff_Info.PeCoffRebase()
+            if PeCoff_Info.IfRebase:
+                PeCoff_Info.PeCoffRebase()
             PeCoff_Tree = BIOSTREE(PeCoff_Info.Name)
             PeCoff_Tree.type = PECOFF_TREE
             PeCoff_Tree.Data = PeCoff_Info
