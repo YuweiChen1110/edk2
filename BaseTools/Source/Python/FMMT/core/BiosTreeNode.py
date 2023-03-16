@@ -77,8 +77,8 @@ class FvNode:
         self.PadData = b''
         self.Free_Space = 0
         self.ModCheckSum()
-        self.ImageSize = None
-        self.BaseAddress = None
+        self.ImageSize = 0
+        self.BaseAddress = 0
 
     def ModCheckSum(self) -> None:
         # Fv Header Sums to 0.

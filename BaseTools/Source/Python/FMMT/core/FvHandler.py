@@ -731,7 +731,7 @@ class FvHandler:
         RebaseSize = 0
         FfsDataOffset = 0
         SecOffset = 0
-        if TargetFfs.Parent.Data.type == FV_TREE or TargetFfs.Parent.Data.type == ROOT_FV_TREE:
+        if TargetFfs.Parent.type == FV_TREE or TargetFfs.Parent.type == ROOT_FV_TREE:
             if TargetFfs.Data.PeCoffSecIndex != None:
                 TargetFv = TargetFfs.Parent
                 TargetFfsIndex = TargetFv.Child.index(TargetFfs)
