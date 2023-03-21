@@ -102,7 +102,7 @@ class SectionProduct(BinaryProduct):
             Section_Tree.insertChild(Sec_Fv_Tree)
             Fv_count += 1
         elif Section_Tree.Data.Type == EFI_SECTION_PE32 or Section_Tree.Data.Type == EFI_SECTION_TE:
-            if Section_Tree.Parent.Parent.type == FV_TREE or Section_Tree.Parent.Parent.type == ROOT_FV_TREE:
+            if Section_Tree.Parent.Parent.type == FV_TREE or Section_Tree.Parent.Parent.type == ROOT_FV_TREE or Section_Tree.Parent.Parent.type == ROOT_FFS_TREE:
                 self.ParserPeCoff(Section_Tree, b'')
 
     def ParserSection(self, ParTree, Whole_Data: bytes, Rel_Whole_Offset: int=0) -> None:
