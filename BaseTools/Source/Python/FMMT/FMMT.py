@@ -164,7 +164,9 @@ def main():
         else:
             parser.print_help()
     except Exception as e:
-        print(e)
+        logger.error(
+            "FMMT operation failed with error!")
+        raise(e)
     endtime = time.time()
     logger.info("The FMMT action is done successfully!")
     logger.info("Total spend time: %s s" % (endtime - starttime))

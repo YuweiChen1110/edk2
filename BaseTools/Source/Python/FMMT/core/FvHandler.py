@@ -384,190 +384,239 @@ class FvHandler:
             self.Status = True
 
     def ReplaceFfs(self) -> bool:
-        logger.debug('Start Replacing Process......')
-        TargetFv = self.TargetFfs.Parent
-        # If the Fv Header Attributes is EFI_FVB2_ERASE_POLARITY, Child Ffs Header State need be reversed.
-        if TargetFv.Data.Header.Attributes & EFI_FVB2_ERASE_POLARITY:
-                self.NewFfs.Data.Header.State = c_uint8(
-                    ~self.NewFfs.Data.Header.State)
-        # NewFfs parsing will not calculate the PadSize, thus recalculate.
-        self.NewFfs.Data.PadData = b'\xff' * GetPadSize(self.NewFfs.Data.Size, FFS_COMMON_ALIGNMENT)
-        if self.NewFfs.Data.Size >= self.TargetFfs.Data.Size:
-            Needed_Space = self.NewFfs.Data.Size + len(self.NewFfs.Data.PadData) - self.TargetFfs.Data.Size - len(self.TargetFfs.Data.PadData)
-            # If TargetFv have enough free space, just move part of the free space to NewFfs.
-            if Needed_Space == 0:
-                Target_index = TargetFv.Child.index(self.TargetFfs)
-                TargetFv.Child.remove(self.TargetFfs)
-                TargetFv.insertChild(self.NewFfs, Target_index)
-                RebaseSize = self.GetRebaseSize(self.NewFfs)
-                CalcuFlag = 1
-                self.RebaseFfs(self.NewFfs, RebaseSize, CalcuFlag)
-                # Modify TargetFv Header and ExtHeader info.
-                TargetFv.Data.ModFvExt()
-                TargetFv.Data.ModFvSize()
-                TargetFv.Data.ModExtHeaderData()
-                ModifyFvExtData(TargetFv)
-                TargetFv.Data.ModCheckSum()
-                # Recompress from the Fv node to update all the related node data.
-                self.CompressData(TargetFv)
-                # return the Status
-                self.Status = True
-            elif TargetFv.Data.Free_Space >= Needed_Space:
-                # Modify TargetFv Child info and BiosTree.
-                TargetFv.Child[-1].Data.Data = b'\xff' * (TargetFv.Data.Free_Space - Needed_Space)
-                TargetFv.Data.Free_Space -= Needed_Space
-                Target_index = TargetFv.Child.index(self.TargetFfs)
-                TargetFv.Child.remove(self.TargetFfs)
-                TargetFv.insertChild(self.NewFfs, Target_index)
-                RebaseSize = self.GetRebaseSize(self.NewFfs)
-                CalcuFlag = 1
-                self.RebaseFfs(self.NewFfs, RebaseSize, CalcuFlag)
-                # Modify TargetFv Header and ExtHeader info.
-                TargetFv.Data.ModFvExt()
-                TargetFv.Data.ModFvSize()
-                TargetFv.Data.ModExtHeaderData()
-                ModifyFvExtData(TargetFv)
-                TargetFv.Data.ModCheckSum()
-                # Recompress from the Fv node to update all the related node data.
-                self.CompressData(TargetFv)
-                # return the Status
-                self.Status = True
-            # If TargetFv do not have enough free space, need move part of the free space of TargetFv's parent Fv to TargetFv/NewFfs.
-            else:
-                if TargetFv.type == FV_TREE:
-                    self.Status = False
-                else:
-                    # Recalculate TargetFv needed space to keep it match the BlockSize setting.
-                    Needed_Space -= TargetFv.Data.Free_Space
-                    BlockSize = TargetFv.Data.Header.BlockMap[0].Length
-                    New_Add_Len = BlockSize - Needed_Space%BlockSize
+        try:
+            logger.debug('Start Replacing Process......')
+            TargetFv = self.TargetFfs.Parent
+            # If the Fv Header Attributes is EFI_FVB2_ERASE_POLARITY, Child Ffs Header State need be reversed.
+            if TargetFv.Data.Header.Attributes & EFI_FVB2_ERASE_POLARITY:
+                    self.NewFfs.Data.Header.State = c_uint8(
+                        ~self.NewFfs.Data.Header.State)
+            # NewFfs parsing will not calculate the PadSize, thus recalculate.
+            self.NewFfs.Data.PadData = b'\xff' * GetPadSize(self.NewFfs.Data.Size, FFS_COMMON_ALIGNMENT)
+            if self.NewFfs.Data.Size >= self.TargetFfs.Data.Size:
+                Needed_Space = self.NewFfs.Data.Size + len(self.NewFfs.Data.PadData) - self.TargetFfs.Data.Size - len(self.TargetFfs.Data.PadData)
+                # If TargetFv have enough free space, just move part of the free space to NewFfs.
+                if Needed_Space == 0:
                     Target_index = TargetFv.Child.index(self.TargetFfs)
-                    if New_Add_Len % BlockSize:
-                        TargetFv.Child[-1].Data.Data = b'\xff' * New_Add_Len
-                        TargetFv.Data.Free_Space = New_Add_Len
-                        Needed_Space += New_Add_Len
-                        TargetFv.insertChild(self.NewFfs, Target_index)
-                        TargetFv.Child.remove(self.TargetFfs)
-                    else:
-                        TargetFv.Child.remove(self.TargetFfs)
-                        TargetFv.Data.Free_Space = 0
-                        TargetFv.insertChild(self.NewFfs)
+                    TargetFv.Child.remove(self.TargetFfs)
+                    TargetFv.insertChild(self.NewFfs, Target_index)
                     RebaseSize = self.GetRebaseSize(self.NewFfs)
                     CalcuFlag = 1
                     self.RebaseFfs(self.NewFfs, RebaseSize, CalcuFlag)
-                    # Encapsulate the Fv Data for update.
-                    TargetFv.Data.Data = b''
-                    for item in TargetFv.Child:
-                        if item.type == FFS_FREE_SPACE:
-                            TargetFv.Data.Data += item.Data.Data + item.Data.PadData
-                        else:
-                            TargetFv.Data.Data += struct2stream(item.Data.Header)+ item.Data.Data + item.Data.PadData
-                    TargetFv.Data.Size += Needed_Space
-                    # Modify TargetFv Data Header and ExtHeader info.
-                    TargetFv.Data.Header.FvLength = TargetFv.Data.Size
+                    # Modify TargetFv Header and ExtHeader info.
                     TargetFv.Data.ModFvExt()
                     TargetFv.Data.ModFvSize()
                     TargetFv.Data.ModExtHeaderData()
                     ModifyFvExtData(TargetFv)
                     TargetFv.Data.ModCheckSum()
-                    # Start free space calculating and moving process.
-                    self.ModifyTest(TargetFv.Parent, Needed_Space)
-        else:
-            New_Free_Space = self.TargetFfs.Data.Size - self.NewFfs.Data.Size
-            # If TargetFv already have free space, move the new free space into it.
-            if TargetFv.Data.Free_Space:
-                TargetFv.Child[-1].Data.Data += b'\xff' * New_Free_Space
-                TargetFv.Data.Free_Space += New_Free_Space
-                Target_index = TargetFv.Child.index(self.TargetFfs)
-                TargetFv.Child.remove(self.TargetFfs)
-                TargetFv.insertChild(self.NewFfs, Target_index)
-            # If TargetFv do not have free space, create free space for Fv.
+                    # Recompress from the Fv node to update all the related node data.
+                    self.CompressData(TargetFv)
+                    # return the Status
+                    self.Status = True
+                elif TargetFv.Data.Free_Space >= Needed_Space:
+                    # Modify TargetFv Child info and BiosTree.
+                    TargetFv.Child[-1].Data.Data = b'\xff' * (TargetFv.Data.Free_Space - Needed_Space)
+                    TargetFv.Data.Free_Space -= Needed_Space
+                    Target_index = TargetFv.Child.index(self.TargetFfs)
+                    TargetFv.Child.remove(self.TargetFfs)
+                    TargetFv.insertChild(self.NewFfs, Target_index)
+                    RebaseSize = self.GetRebaseSize(self.NewFfs)
+                    CalcuFlag = 1
+                    self.RebaseFfs(self.NewFfs, RebaseSize, CalcuFlag)
+                    # Modify TargetFv Header and ExtHeader info.
+                    TargetFv.Data.ModFvExt()
+                    TargetFv.Data.ModFvSize()
+                    TargetFv.Data.ModExtHeaderData()
+                    ModifyFvExtData(TargetFv)
+                    TargetFv.Data.ModCheckSum()
+                    # Recompress from the Fv node to update all the related node data.
+                    self.CompressData(TargetFv)
+                    # return the Status
+                    self.Status = True
+                # If TargetFv do not have enough free space, need move part of the free space of TargetFv's parent Fv to TargetFv/NewFfs.
+                else:
+                    if TargetFv.type == FV_TREE:
+                        self.Status = False
+                    else:
+                        # Recalculate TargetFv needed space to keep it match the BlockSize setting.
+                        Needed_Space -= TargetFv.Data.Free_Space
+                        BlockSize = TargetFv.Data.Header.BlockMap[0].Length
+                        New_Add_Len = BlockSize - Needed_Space%BlockSize
+                        Target_index = TargetFv.Child.index(self.TargetFfs)
+                        if New_Add_Len % BlockSize:
+                            TargetFv.Child[-1].Data.Data = b'\xff' * New_Add_Len
+                            TargetFv.Data.Free_Space = New_Add_Len
+                            Needed_Space += New_Add_Len
+                            TargetFv.insertChild(self.NewFfs, Target_index)
+                            TargetFv.Child.remove(self.TargetFfs)
+                        else:
+                            TargetFv.Child.remove(self.TargetFfs)
+                            TargetFv.Data.Free_Space = 0
+                            TargetFv.insertChild(self.NewFfs)
+                        RebaseSize = self.GetRebaseSize(self.NewFfs)
+                        CalcuFlag = 1
+                        self.RebaseFfs(self.NewFfs, RebaseSize, CalcuFlag)
+                        # Encapsulate the Fv Data for update.
+                        TargetFv.Data.Data = b''
+                        for item in TargetFv.Child:
+                            if item.type == FFS_FREE_SPACE:
+                                TargetFv.Data.Data += item.Data.Data + item.Data.PadData
+                            else:
+                                TargetFv.Data.Data += struct2stream(item.Data.Header)+ item.Data.Data + item.Data.PadData
+                        TargetFv.Data.Size += Needed_Space
+                        # Modify TargetFv Data Header and ExtHeader info.
+                        TargetFv.Data.Header.FvLength = TargetFv.Data.Size
+                        TargetFv.Data.ModFvExt()
+                        TargetFv.Data.ModFvSize()
+                        TargetFv.Data.ModExtHeaderData()
+                        ModifyFvExtData(TargetFv)
+                        TargetFv.Data.ModCheckSum()
+                        # Start free space calculating and moving process.
+                        self.ModifyTest(TargetFv.Parent, Needed_Space)
             else:
-                New_Free_Space_Tree = BIOSTREE('FREE_SPACE')
-                New_Free_Space_Tree.type = FFS_FREE_SPACE
-                New_Free_Space_Tree.Data = FfsNode(b'\xff' * New_Free_Space)
-                TargetFv.Data.Free_Space = New_Free_Space
-                TargetFv.insertChild(New_Free_Space)
-                Target_index = TargetFv.Child.index(self.TargetFfs)
-                TargetFv.Child.remove(self.TargetFfs)
-                TargetFv.insertChild(self.NewFfs, Target_index)
-            RebaseSize = self.GetRebaseSize(self.NewFfs)
-            CalcuFlag = 1
-            self.RebaseFfs(self.NewFfs, RebaseSize, CalcuFlag)
-            # Modify TargetFv Header and ExtHeader info.
-            TargetFv.Data.ModFvExt()
-            TargetFv.Data.ModFvSize()
-            TargetFv.Data.ModExtHeaderData()
-            ModifyFvExtData(TargetFv)
-            TargetFv.Data.ModCheckSum()
-            # Recompress from the Fv node to update all the related node data.
-            self.CompressData(TargetFv)
-            self.Status = True
-        logger.debug('Done!')
-        return self.Status
-
-    def AddFfs(self, TargetOrder=None) -> bool:
-        logger.debug('Start Adding Process......')
-        self.TargetOrder = TargetOrder
-        # NewFfs parsing will not calculate the PadSize, thus recalculate.
-        self.NewFfs.Data.PadData = b'\xff' * GetPadSize(self.NewFfs.Data.Size, FFS_COMMON_ALIGNMENT)
-        if self.TargetFfs.type == FFS_FREE_SPACE:
-            TargetLen = self.NewFfs.Data.Size + len(self.NewFfs.Data.PadData) - self.TargetFfs.Data.Size - len(self.TargetFfs.Data.PadData)
-            TargetFv = self.TargetFfs.Parent
-            # If the Fv Header Attributes is EFI_FVB2_ERASE_POLARITY, Child Ffs Header State need be reversed.
-            if TargetFv.Data.Header.Attributes & EFI_FVB2_ERASE_POLARITY:
-                self.NewFfs.Data.Header.State = c_uint8(
-                    ~self.NewFfs.Data.Header.State)
-            # If TargetFv have enough free space, just move part of the free space to NewFfs, split free space to NewFfs and new free space.
-            if TargetLen < 0:
-                self.TargetFfs.Data.Data = b'\xff' * (-TargetLen)
-                TargetFv.Data.Free_Space = (-TargetLen)
+                New_Free_Space = self.TargetFfs.Data.Size - self.NewFfs.Data.Size
+                # If TargetFv already have free space, move the new free space into it.
+                if TargetFv.Data.Free_Space:
+                    TargetFv.Child[-1].Data.Data += b'\xff' * New_Free_Space
+                    TargetFv.Data.Free_Space += New_Free_Space
+                    Target_index = TargetFv.Child.index(self.TargetFfs)
+                    TargetFv.Child.remove(self.TargetFfs)
+                    TargetFv.insertChild(self.NewFfs, Target_index)
+                # If TargetFv do not have free space, create free space for Fv.
+                else:
+                    New_Free_Space_Tree = BIOSTREE('FREE_SPACE')
+                    New_Free_Space_Tree.type = FFS_FREE_SPACE
+                    New_Free_Space_Tree.Data = FfsNode(b'\xff' * New_Free_Space)
+                    TargetFv.Data.Free_Space = New_Free_Space
+                    TargetFv.insertChild(New_Free_Space)
+                    Target_index = TargetFv.Child.index(self.TargetFfs)
+                    TargetFv.Child.remove(self.TargetFfs)
+                    TargetFv.insertChild(self.NewFfs, Target_index)
+                RebaseSize = self.GetRebaseSize(self.NewFfs)
+                CalcuFlag = 1
+                self.RebaseFfs(self.NewFfs, RebaseSize, CalcuFlag)
+                # Modify TargetFv Header and ExtHeader info.
                 TargetFv.Data.ModFvExt()
+                TargetFv.Data.ModFvSize()
                 TargetFv.Data.ModExtHeaderData()
                 ModifyFvExtData(TargetFv)
                 TargetFv.Data.ModCheckSum()
-                if self.TargetOrder != None:
+                # Recompress from the Fv node to update all the related node data.
+                self.CompressData(TargetFv)
+                self.Status = True
+            logger.debug('Done!')
+        except Exception as e:
+            logger.error(
+                "FvHandler ReplaceFfs error!")
+            raise(e)
+        return self.Status
+
+    def AddFfs(self, TargetOrder=None) -> bool:
+        try:
+            logger.debug('Start Adding Process......')
+            self.TargetOrder = TargetOrder
+            # NewFfs parsing will not calculate the PadSize, thus recalculate.
+            self.NewFfs.Data.PadData = b'\xff' * GetPadSize(self.NewFfs.Data.Size, FFS_COMMON_ALIGNMENT)
+            if self.TargetFfs.type == FFS_FREE_SPACE:
+                TargetLen = self.NewFfs.Data.Size + len(self.NewFfs.Data.PadData) - self.TargetFfs.Data.Size - len(self.TargetFfs.Data.PadData)
+                TargetFv = self.TargetFfs.Parent
+                # If the Fv Header Attributes is EFI_FVB2_ERASE_POLARITY, Child Ffs Header State need be reversed.
+                if TargetFv.Data.Header.Attributes & EFI_FVB2_ERASE_POLARITY:
+                    self.NewFfs.Data.Header.State = c_uint8(
+                        ~self.NewFfs.Data.Header.State)
+                # If TargetFv have enough free space, just move part of the free space to NewFfs, split free space to NewFfs and new free space.
+                if TargetLen < 0:
+                    self.TargetFfs.Data.Data = b'\xff' * (-TargetLen)
+                    TargetFv.Data.Free_Space = (-TargetLen)
+                    TargetFv.Data.ModFvExt()
+                    TargetFv.Data.ModExtHeaderData()
+                    ModifyFvExtData(TargetFv)
+                    TargetFv.Data.ModCheckSum()
+                    if self.TargetOrder != None:
+                        TargetFv.insertChild(self.NewFfs, self.TargetOrder)
+                    else:
+                        TargetFv.insertChild(self.NewFfs, -1)
+                    ModifyFfsType(self.NewFfs)
+                    RebaseSize = self.GetRebaseSize(self.NewFfs)
+                    CalcuFlag = 1
+                    self.RebaseFfs(self.NewFfs, RebaseSize, CalcuFlag)
+                    # Recompress from the Fv node to update all the related node data.
+                    self.CompressData(TargetFv)
+                    self.Status = True
+                elif TargetLen == 0:
+                    TargetFv.Child.remove(self.TargetFfs)
                     TargetFv.insertChild(self.NewFfs, self.TargetOrder)
+                    ModifyFfsType(self.NewFfs)
+                    RebaseSize = self.GetRebaseSize(self.NewFfs)
+                    CalcuFlag = 1
+                    self.RebaseFfs(self.NewFfs, RebaseSize, CalcuFlag)
+                    # Recompress from the Fv node to update all the related node data.
+                    self.CompressData(TargetFv)
+                    self.Status = True
+                # If TargetFv do not have enough free space, need move part of the free space of TargetFv's parent Fv to TargetFv/NewFfs.
                 else:
-                    TargetFv.insertChild(self.NewFfs, -1)
-                ModifyFfsType(self.NewFfs)
-                RebaseSize = self.GetRebaseSize(self.NewFfs)
-                CalcuFlag = 1
-                self.RebaseFfs(self.NewFfs, RebaseSize, CalcuFlag)
-                # Recompress from the Fv node to update all the related node data.
-                self.CompressData(TargetFv)
-                self.Status = True
-            elif TargetLen == 0:
-                TargetFv.Child.remove(self.TargetFfs)
-                TargetFv.insertChild(self.NewFfs, self.TargetOrder)
-                ModifyFfsType(self.NewFfs)
-                RebaseSize = self.GetRebaseSize(self.NewFfs)
-                CalcuFlag = 1
-                self.RebaseFfs(self.NewFfs, RebaseSize, CalcuFlag)
-                # Recompress from the Fv node to update all the related node data.
-                self.CompressData(TargetFv)
-                self.Status = True
-            # If TargetFv do not have enough free space, need move part of the free space of TargetFv's parent Fv to TargetFv/NewFfs.
+                    if TargetFv.type == FV_TREE:
+                        self.Status = False
+                    elif TargetFv.type == SEC_FV_TREE:
+                        # Recalculate TargetFv needed space to keep it match the BlockSize setting.
+                        BlockSize = TargetFv.Data.Header.BlockMap[0].Length
+                        New_Add_Len = BlockSize - TargetLen%BlockSize
+                        if New_Add_Len % BlockSize:
+                            self.TargetFfs.Data.Data = b'\xff' * New_Add_Len
+                            self.TargetFfs.Data.Size = New_Add_Len
+                            TargetLen += New_Add_Len
+                            if self.TargetOrder != None:
+                                TargetFv.insertChild(self.NewFfs, -1)
+                            else:
+                                TargetFv.insertChild(self.NewFfs, self.TargetOrder)
+                            TargetFv.Data.Free_Space = New_Add_Len
+                        else:
+                            TargetFv.Child.remove(self.TargetFfs)
+                            TargetFv.insertChild(self.NewFfs, self.TargetOrder)
+                            TargetFv.Data.Free_Space = 0
+                        ModifyFfsType(self.NewFfs)
+                        RebaseSize = self.GetRebaseSize(self.NewFfs)
+                        CalcuFlag = 1
+                        self.RebaseFfs(self.NewFfs, RebaseSize, CalcuFlag)
+                        ModifyFvSystemGuid(TargetFv)
+                        TargetFv.Data.Data = b''
+                        for item in TargetFv.Child:
+                            if item.type == FFS_FREE_SPACE:
+                                TargetFv.Data.Data += item.Data.Data + item.Data.PadData
+                            else:
+                                TargetFv.Data.Data += struct2stream(item.Data.Header)+ item.Data.Data + item.Data.PadData
+                        # Encapsulate the Fv Data for update.
+                        TargetFv.Data.Size += TargetLen
+                        TargetFv.Data.Header.FvLength = TargetFv.Data.Size
+                        TargetFv.Data.ModFvExt()
+                        TargetFv.Data.ModFvSize()
+                        TargetFv.Data.ModExtHeaderData()
+                        ModifyFvExtData(TargetFv)
+                        TargetFv.Data.ModCheckSum()
+                        # Start free space calculating and moving process.
+                        self.ModifyTest(TargetFv.Parent, TargetLen)
             else:
+                # If TargetFv do not have free space, need directly move part of the free space of TargetFv's parent Fv to TargetFv/NewFfs.
+                TargetLen = self.NewFfs.Data.Size + len(self.NewFfs.Data.PadData)
+                TargetFv = self.TargetFfs.Parent
+                if TargetFv.Data.Header.Attributes & EFI_FVB2_ERASE_POLARITY:
+                    self.NewFfs.Data.Header.State = c_uint8(
+                        ~self.NewFfs.Data.Header.State)
                 if TargetFv.type == FV_TREE:
                     self.Status = False
                 elif TargetFv.type == SEC_FV_TREE:
-                    # Recalculate TargetFv needed space to keep it match the BlockSize setting.
                     BlockSize = TargetFv.Data.Header.BlockMap[0].Length
                     New_Add_Len = BlockSize - TargetLen%BlockSize
                     if New_Add_Len % BlockSize:
-                        self.TargetFfs.Data.Data = b'\xff' * New_Add_Len
-                        self.TargetFfs.Data.Size = New_Add_Len
+                        New_Free_Space = BIOSTREE('FREE_SPACE')
+                        New_Free_Space.type = FFS_FREE_SPACE
+                        New_Free_Space.Data = FreeSpaceNode(b'\xff' * New_Add_Len)
                         TargetLen += New_Add_Len
-                        if self.TargetOrder != None:
-                            TargetFv.insertChild(self.NewFfs, -1)
-                        else:
-                            TargetFv.insertChild(self.NewFfs, self.TargetOrder)
                         TargetFv.Data.Free_Space = New_Add_Len
-                    else:
-                        TargetFv.Child.remove(self.TargetFfs)
                         TargetFv.insertChild(self.NewFfs, self.TargetOrder)
-                        TargetFv.Data.Free_Space = 0
+                        TargetFv.insertChild(New_Free_Space)
+                    else:
+                        TargetFv.insertChild(self.NewFfs, self.TargetOrder)
                     ModifyFfsType(self.NewFfs)
                     RebaseSize = self.GetRebaseSize(self.NewFfs)
                     CalcuFlag = 1
@@ -579,7 +628,6 @@ class FvHandler:
                             TargetFv.Data.Data += item.Data.Data + item.Data.PadData
                         else:
                             TargetFv.Data.Data += struct2stream(item.Data.Header)+ item.Data.Data + item.Data.PadData
-                    # Encapsulate the Fv Data for update.
                     TargetFv.Data.Size += TargetLen
                     TargetFv.Data.Header.FvLength = TargetFv.Data.Size
                     TargetFv.Data.ModFvExt()
@@ -587,144 +635,116 @@ class FvHandler:
                     TargetFv.Data.ModExtHeaderData()
                     ModifyFvExtData(TargetFv)
                     TargetFv.Data.ModCheckSum()
-                    # Start free space calculating and moving process.
                     self.ModifyTest(TargetFv.Parent, TargetLen)
-        else:
-            # If TargetFv do not have free space, need directly move part of the free space of TargetFv's parent Fv to TargetFv/NewFfs.
-            TargetLen = self.NewFfs.Data.Size + len(self.NewFfs.Data.PadData)
-            TargetFv = self.TargetFfs.Parent
-            if TargetFv.Data.Header.Attributes & EFI_FVB2_ERASE_POLARITY:
-                self.NewFfs.Data.Header.State = c_uint8(
-                    ~self.NewFfs.Data.Header.State)
-            if TargetFv.type == FV_TREE:
-                self.Status = False
-            elif TargetFv.type == SEC_FV_TREE:
-                BlockSize = TargetFv.Data.Header.BlockMap[0].Length
-                New_Add_Len = BlockSize - TargetLen%BlockSize
-                if New_Add_Len % BlockSize:
-                    New_Free_Space = BIOSTREE('FREE_SPACE')
-                    New_Free_Space.type = FFS_FREE_SPACE
-                    New_Free_Space.Data = FreeSpaceNode(b'\xff' * New_Add_Len)
-                    TargetLen += New_Add_Len
-                    TargetFv.Data.Free_Space = New_Add_Len
-                    TargetFv.insertChild(self.NewFfs, self.TargetOrder)
-                    TargetFv.insertChild(New_Free_Space)
+            logger.debug('Done!')
+        except Exception as e:
+            logger.error(
+                "FvHandler AddFfs error!")
+            raise(e)
+        return self.Status
+
+    def DeleteFfs(self) -> bool:
+        try:
+            logger.debug('Start Deleting Process......')
+            Delete_Ffs = self.TargetFfs
+            Delete_Fv = Delete_Ffs.Parent
+            # Calculate free space
+            Add_Free_Space = Delete_Ffs.Data.Size + len(Delete_Ffs.Data.PadData)
+            # If Ffs parent Fv have free space, follow the rules to merge the new free space.
+            if Delete_Fv.Data.Free_Space:
+                # If Fv is a Section fv, free space need to be recalculated to keep align with BlockSize.
+                # Other free space saved in self.Remain_New_Free_Space, will be moved to the 1st level Fv.
+                if Delete_Fv.type == SEC_FV_TREE:
+                    Used_Size = Delete_Fv.Data.Size - Delete_Fv.Data.Free_Space - Add_Free_Space
+                    BlockSize = Delete_Fv.Data.Header.BlockMap[0].Length
+                    New_Free_Space = BlockSize - Used_Size % BlockSize
+                    self.Remain_New_Free_Space += Delete_Fv.Data.Free_Space + Add_Free_Space - New_Free_Space
+                    Delete_Fv.Child[-1].Data.Data = New_Free_Space * b'\xff'
+                    Delete_Fv.Data.Free_Space = New_Free_Space
+                # If Fv is lst level Fv, new free space will be merged with origin free space.
                 else:
-                    TargetFv.insertChild(self.NewFfs, self.TargetOrder)
-                ModifyFfsType(self.NewFfs)
-                RebaseSize = self.GetRebaseSize(self.NewFfs)
+                    Used_Size = Delete_Fv.Data.Size - Delete_Fv.Data.Free_Space - Add_Free_Space
+                    Delete_Fv.Child[-1].Data.Data += Add_Free_Space * b'\xff'
+                    Delete_Fv.Data.Free_Space += Add_Free_Space
+                    New_Free_Space = Delete_Fv.Data.Free_Space
+            # If Ffs parent Fv not have free space, will create new free space node to save the free space.
+            else:
+                # If Fv is a Section fv, new free space need to be recalculated to keep align with BlockSize.
+                # Then create a Free spcae node to save the 0xff data, and insert into the Fv.
+                # If have more space left, move to 1st level fv.
+                if Delete_Fv.type == SEC_FV_TREE:
+                    Used_Size = Delete_Fv.Data.Size - Add_Free_Space
+                    BlockSize = Delete_Fv.Data.Header.BlockMap[0].Length
+                    New_Free_Space = BlockSize - Used_Size % BlockSize
+                    self.Remain_New_Free_Space += Add_Free_Space - New_Free_Space
+                    Add_Free_Space = New_Free_Space
+                # If Fv is lst level Fv, new free space node will be created to save the free space.
+                else:
+                    Used_Size = Delete_Fv.Data.Size - Add_Free_Space
+                    New_Free_Space = Add_Free_Space
+                New_Free_Space_Info = FfsNode(Add_Free_Space * b'\xff')
+                New_Free_Space_Info.Data = Add_Free_Space * b'\xff'
+                New_Ffs_Tree = BIOSTREE(New_Free_Space_Info.Name)
+                New_Ffs_Tree.type = FFS_FREE_SPACE
+                New_Ffs_Tree.Data = New_Free_Space_Info
+                Delete_Fv.insertChild(New_Ffs_Tree)
+                Delete_Fv.Data.Free_Space = Add_Free_Space
+            IfRebase = False
+            while Delete_Ffs.NextRel:
+                CurFfs = Delete_Ffs.NextRel
+                if CurFfs.Data.PeCoffSecIndex != None:
+                    IfRebase = True
+                    break
+            Delete_Fv.Child.remove(Delete_Ffs)
+            if IfRebase:
+                RebaseSize = self.GetRebaseSize(CurFfs)
                 CalcuFlag = 1
-                self.RebaseFfs(self.NewFfs, RebaseSize, CalcuFlag)
+                self.RebaseFfs(CurFfs, RebaseSize, CalcuFlag)
+            Delete_Fv.Data.Header.FvLength = Used_Size + New_Free_Space
+            Delete_Fv.Data.ModFvExt()
+            Delete_Fv.Data.ModFvSize()
+            Delete_Fv.Data.ModExtHeaderData()
+            ModifyFvExtData(Delete_Fv)
+            Delete_Fv.Data.ModCheckSum()
+            # Recompress from the Fv node to update all the related node data.
+            self.CompressData(Delete_Fv)
+            self.Status = True
+            logger.debug('Done!')
+        except Exception as e:
+            logger.error(
+                "FvHandler DeleteFfs error!")
+            raise(e)
+        return self.Status
+
+    def ShrinkFv(self) -> bool:
+        try:
+            TargetFv = self.NewFfs
+            TargetFv.Data.Data = b''
+            if not TargetFv.Data.Free_Space:
+                self.Status = True
+            else:
+                BlockSize = TargetFv.Data.Header.BlockMap[0].Length
+                New_Free_Space = TargetFv.Data.Free_Space%BlockSize
+                Removed_Space = TargetFv.Data.Free_Space - New_Free_Space
+                TargetFv.Child[-1].Data.Data = b'\xff' * New_Free_Space
+                TargetFv.Data.Size -= Removed_Space
+                TargetFv.Data.Header.Fvlength = TargetFv.Data.Size
                 ModifyFvSystemGuid(TargetFv)
-                TargetFv.Data.Data = b''
                 for item in TargetFv.Child:
                     if item.type == FFS_FREE_SPACE:
                         TargetFv.Data.Data += item.Data.Data + item.Data.PadData
                     else:
                         TargetFv.Data.Data += struct2stream(item.Data.Header)+ item.Data.Data + item.Data.PadData
-                TargetFv.Data.Size += TargetLen
-                TargetFv.Data.Header.FvLength = TargetFv.Data.Size
                 TargetFv.Data.ModFvExt()
                 TargetFv.Data.ModFvSize()
                 TargetFv.Data.ModExtHeaderData()
                 ModifyFvExtData(TargetFv)
                 TargetFv.Data.ModCheckSum()
-                self.ModifyTest(TargetFv.Parent, TargetLen)
-        logger.debug('Done!')
-        return self.Status
-
-    def DeleteFfs(self) -> bool:
-        logger.debug('Start Deleting Process......')
-        Delete_Ffs = self.TargetFfs
-        Delete_Fv = Delete_Ffs.Parent
-        # Calculate free space
-        Add_Free_Space = Delete_Ffs.Data.Size + len(Delete_Ffs.Data.PadData)
-        # If Ffs parent Fv have free space, follow the rules to merge the new free space.
-        if Delete_Fv.Data.Free_Space:
-            # If Fv is a Section fv, free space need to be recalculated to keep align with BlockSize.
-            # Other free space saved in self.Remain_New_Free_Space, will be moved to the 1st level Fv.
-            if Delete_Fv.type == SEC_FV_TREE:
-                Used_Size = Delete_Fv.Data.Size - Delete_Fv.Data.Free_Space - Add_Free_Space
-                BlockSize = Delete_Fv.Data.Header.BlockMap[0].Length
-                New_Free_Space = BlockSize - Used_Size % BlockSize
-                self.Remain_New_Free_Space += Delete_Fv.Data.Free_Space + Add_Free_Space - New_Free_Space
-                Delete_Fv.Child[-1].Data.Data = New_Free_Space * b'\xff'
-                Delete_Fv.Data.Free_Space = New_Free_Space
-            # If Fv is lst level Fv, new free space will be merged with origin free space.
-            else:
-                Used_Size = Delete_Fv.Data.Size - Delete_Fv.Data.Free_Space - Add_Free_Space
-                Delete_Fv.Child[-1].Data.Data += Add_Free_Space * b'\xff'
-                Delete_Fv.Data.Free_Space += Add_Free_Space
-                New_Free_Space = Delete_Fv.Data.Free_Space
-        # If Ffs parent Fv not have free space, will create new free space node to save the free space.
-        else:
-            # If Fv is a Section fv, new free space need to be recalculated to keep align with BlockSize.
-            # Then create a Free spcae node to save the 0xff data, and insert into the Fv.
-            # If have more space left, move to 1st level fv.
-            if Delete_Fv.type == SEC_FV_TREE:
-                Used_Size = Delete_Fv.Data.Size - Add_Free_Space
-                BlockSize = Delete_Fv.Data.Header.BlockMap[0].Length
-                New_Free_Space = BlockSize - Used_Size % BlockSize
-                self.Remain_New_Free_Space += Add_Free_Space - New_Free_Space
-                Add_Free_Space = New_Free_Space
-            # If Fv is lst level Fv, new free space node will be created to save the free space.
-            else:
-                Used_Size = Delete_Fv.Data.Size - Add_Free_Space
-                New_Free_Space = Add_Free_Space
-            New_Free_Space_Info = FfsNode(Add_Free_Space * b'\xff')
-            New_Free_Space_Info.Data = Add_Free_Space * b'\xff'
-            New_Ffs_Tree = BIOSTREE(New_Free_Space_Info.Name)
-            New_Ffs_Tree.type = FFS_FREE_SPACE
-            New_Ffs_Tree.Data = New_Free_Space_Info
-            Delete_Fv.insertChild(New_Ffs_Tree)
-            Delete_Fv.Data.Free_Space = Add_Free_Space
-        IfRebase = False
-        while Delete_Ffs.NextRel:
-            CurFfs = Delete_Ffs.NextRel
-            if CurFfs.Data.PeCoffSecIndex != None:
-                IfRebase = True
-                break
-        Delete_Fv.Child.remove(Delete_Ffs)
-        if IfRebase:
-            RebaseSize = self.GetRebaseSize(CurFfs)
-            CalcuFlag = 1
-            self.RebaseFfs(CurFfs, RebaseSize, CalcuFlag)
-        Delete_Fv.Data.Header.FvLength = Used_Size + New_Free_Space
-        Delete_Fv.Data.ModFvExt()
-        Delete_Fv.Data.ModFvSize()
-        Delete_Fv.Data.ModExtHeaderData()
-        ModifyFvExtData(Delete_Fv)
-        Delete_Fv.Data.ModCheckSum()
-        # Recompress from the Fv node to update all the related node data.
-        self.CompressData(Delete_Fv)
-        self.Status = True
-        logger.debug('Done!')
-        return self.Status
-
-    def ShrinkFv(self) -> bool:
-        TargetFv = self.NewFfs
-        TargetFv.Data.Data = b''
-        if not TargetFv.Data.Free_Space:
-            self.Status = True
-        else:
-            BlockSize = TargetFv.Data.Header.BlockMap[0].Length
-            New_Free_Space = TargetFv.Data.Free_Space%BlockSize
-            Removed_Space = TargetFv.Data.Free_Space - New_Free_Space
-            TargetFv.Child[-1].Data.Data = b'\xff' * New_Free_Space
-            TargetFv.Data.Size -= Removed_Space
-            TargetFv.Data.Header.Fvlength = TargetFv.Data.Size
-            ModifyFvSystemGuid(TargetFv)
-            for item in TargetFv.Child:
-                if item.type == FFS_FREE_SPACE:
-                    TargetFv.Data.Data += item.Data.Data + item.Data.PadData
-                else:
-                    TargetFv.Data.Data += struct2stream(item.Data.Header)+ item.Data.Data + item.Data.PadData
-            TargetFv.Data.ModFvExt()
-            TargetFv.Data.ModFvSize()
-            TargetFv.Data.ModExtHeaderData()
-            ModifyFvExtData(TargetFv)
-            TargetFv.Data.ModCheckSum()
-            self.Status = True
+                self.Status = True
+        except Exception as e:
+            logger.error(
+                "FvHandler ShrinkFv error!")
+            raise(e)
         return self.Status
 
     def GetRebaseSize(self, TargetFfs)->int:
