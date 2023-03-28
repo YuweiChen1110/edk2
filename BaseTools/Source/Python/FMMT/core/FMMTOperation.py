@@ -74,6 +74,7 @@ def DeleteFfs(inputfile: str, TargetFfs_name: str, outputfile: str, Fv_name: str
             Status = FfsMod.DeleteFfs()
     else:
         logger.error('Target Ffs not found!!!')
+        raise Exception('Target Ffs not found!!!')
     # 4. Data Encapsulation
     if Status:
         logger.debug('Start encapsulating data......')
@@ -81,6 +82,9 @@ def DeleteFfs(inputfile: str, TargetFfs_name: str, outputfile: str, Fv_name: str
         with open(outputfile, "wb") as f:
             f.write(FmmtParser.FinalData)
         logger.debug('Encapsulated data is saved in {}.'.format(outputfile))
+    else:
+        logger.error("DeleteFfs failed!")
+        raise Exception("DeleteFfs failed!")
 
 def AddNewFfs(inputfile: str, Fv_name: str, newffsfile: str, outputfile: str, order=None) -> None:
     if not os.path.exists(inputfile):
@@ -118,6 +122,7 @@ def AddNewFfs(inputfile: str, Fv_name: str, newffsfile: str, outputfile: str, or
             Status = FfsMod.AddFfs(order)
     else:
         logger.error('Target Fv not found!!!')
+        raise Exception('Target Fv not found!!!')
     # 4. Data Encapsulation
     if Status:
         logger.debug('Start encapsulating data......')
@@ -125,6 +130,9 @@ def AddNewFfs(inputfile: str, Fv_name: str, newffsfile: str, outputfile: str, or
         with open(outputfile, "wb") as f:
             f.write(FmmtParser.FinalData)
         logger.debug('Encapsulated data is saved in {}.'.format(outputfile))
+    else:
+        logger.error("AddFfs failed!")
+        raise Exception("AddFfs failed!")
 
 def ReplaceFfs(inputfile: str, Ffs_name: str, newffsfile: str, outputfile: str, Fv_name: str=None) -> None:
     if not os.path.exists(inputfile):
@@ -160,6 +168,7 @@ def ReplaceFfs(inputfile: str, Ffs_name: str, newffsfile: str, outputfile: str, 
             Status = FfsMod.ReplaceFfs()
     else:
         logger.error('Target Ffs not found!!!')
+        raise Exception('Target Ffs not found!!!')
     # 4. Data Encapsulation
     if Status:
         logger.debug('Start encapsulating data......')
@@ -167,6 +176,9 @@ def ReplaceFfs(inputfile: str, Ffs_name: str, newffsfile: str, outputfile: str, 
         with open(outputfile, "wb") as f:
             f.write(FmmtParser.FinalData)
         logger.debug('Encapsulated data is saved in {}.'.format(outputfile))
+    else:
+        logger.error("ReplaceFfs failed!")
+        raise Exception("ReplaceFfs failed!")
 
 def ExtractFfs(inputfile: str, Ffs_name: str, outputfile: str, Fv_name: str=None) -> None:
     if not os.path.exists(inputfile):
@@ -204,6 +216,7 @@ def ExtractFfs(inputfile: str, Ffs_name: str, outputfile: str, Fv_name: str=None
             logger.debug('Extract ffs data is saved in {}.'.format(outputfile))
     else:
         logger.error('Target Ffs/Fv not found!!!')
+        raise Exception('Target Ffs/Fv not found!!!')
 
 def ShrinkFv(inputfile: str, outputfile: str) -> None:
     if not os.path.exists(inputfile):
@@ -223,6 +236,7 @@ def ShrinkFv(inputfile: str, outputfile: str) -> None:
         Status = FvMod.ShrinkFv()
     else:
         logger.error('Target Fv not found!!!')
+        raise Exception('Target Ffs/Fv not found!!!')
     # 4. Data Encapsulation
     if Status:
         logger.debug('Start encapsulating data......')
@@ -230,3 +244,6 @@ def ShrinkFv(inputfile: str, outputfile: str) -> None:
         with open(outputfile, "wb") as f:
             f.write(FmmtParser.FinalData)
         logger.debug('Encapsulated data is saved in {}.'.format(outputfile))
+    else:
+        logger.error("ShrinkFV failed!")
+        raise Exception("ShrinkFV failed!")
