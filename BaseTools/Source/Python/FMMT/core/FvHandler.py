@@ -496,8 +496,8 @@ class FvHandler:
                         New_Pad_Tree.Data.Size = New_Pad_Tree.Data.Header.FFS_FILE_SIZE
                         Target_index = TargetFv.Child.index(self.TargetFfs)
                         TargetFv.Child.remove(self.TargetFfs)
-                        TargetFv.insertChild(self.NewFfs, Target_index)
-                        TargetFv.insertChild(New_Pad_Tree, Target_index+1)
+                        TargetFv.insertChild(New_Pad_Tree, Target_index)
+                        TargetFv.insertChild(self.NewFfs, self.TargetOrder)
                     else:
                         New_Free_Space_Tree = BIOSTREE('FREE_SPACE')
                         New_Free_Space_Tree.type = FFS_FREE_SPACE
@@ -586,7 +586,7 @@ class FvHandler:
                             self.TargetFfs.Data.Data = b'\xff' * New_Add_Len
                             self.TargetFfs.Data.Size = New_Add_Len
                             TargetLen += New_Add_Len
-                            if self.TargetOrder != None:
+                            if self.TargetOrder == None:
                                 TargetFv.insertChild(self.NewFfs, -1)
                             else:
                                 TargetFv.insertChild(self.NewFfs, self.TargetOrder)
