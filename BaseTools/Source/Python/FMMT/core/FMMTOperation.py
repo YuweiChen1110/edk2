@@ -180,7 +180,7 @@ def ReplaceFfs(inputfile: str, Ffs_name: str, newffsfile: str, outputfile: str, 
         logger.error("ReplaceFfs failed!")
         raise Exception("ReplaceFfs failed!")
 
-def ExtractFfs(inputfile: str, Ffs_name: str, outputfile: str, Fv_name: str=None) -> None:
+def ExtractFfs(inputfile: str, Ffs_name: str, outputfile: str, extract_all: bool=False, Fv_name: str=None) -> None:
     if not os.path.exists(inputfile):
         logger.error("Invalid inputfile, can not open {}.".format(inputfile))
         raise Exception("Process Failed: Invalid inputfile!")
@@ -214,6 +214,11 @@ def ExtractFfs(inputfile: str, Ffs_name: str, outputfile: str, Fv_name: str=None
             with open(outputfile, "wb") as f:
                 f.write(FinalData)
             logger.debug('Extract ffs data is saved in {}.'.format(outputfile))
+            if extract_all:
+                outputfolder = os.path.join(os.path.abspath(os.path.dirname(inputfile)), 'extract_'+str(Ffs_name))
+                os.makedirs(outputfolder, exist_ok=True)
+                shutil.move(outputfile, os.path.join(outputfolder, outputfile), copy_function=shutil.copy2)
+                ExtractSection(TargetNode, str(Ffs_name), outputfolder)
     else:
         logger.error('Target Ffs/Fv not found!!!')
         raise Exception('Target Ffs/Fv not found!!!')
@@ -247,3 +252,29 @@ def ShrinkFv(inputfile: str, outputfile: str) -> None:
     else:
         logger.error("ShrinkFV failed!")
         raise Exception("ShrinkFV failed!")
+
+def ExtractSection(FfsNode, Ffs_name, output_folder):
+    for Child in FfsNode.Child:
+        if Child.Data.IsUiSection:
+            UiFileData = b''
+            UiFile = os.path.join(output_folder, Ffs_name+'.ui')
+            UiFileData = struct2stream(Child.Data.Header) + struct2stream(Child.Data.ExtHeader) + Child.Data.Data
+            with open(UiFile, 'wb') as output_uifile:
+                output_uifile.write(UiFileData)
+        elif Child.Data.IsVerSection:
+            VerFileData = b''
+            VerFile = os.path.join(output_folder, Ffs_name+'.ver')
+            VerFileData = struct2stream(Child.Data.Header) + struct2stream(Child.Data.ExtHeader) + Child.Data.Data
+            with open(VerFile, 'wb') as output_verfile:
+                output_verfile.write(VerFileData)
+        elif Child.Data.IsPadSection:
+            continue
+        else:
+            SecFile = os.path.join(output_folder, Ffs_name+'.sec')
+            SecFileData = b''
+            if Child.Data.ExtHeader:
+                SecFileData += struct2stream(Child.Data.Header) + struct2stream(Child.Data.ExtHeader) + Child.Data.Data + Child.Data.PadData
+            else:
+                SecFileData += struct2stream(Child.Data.Header) + Child.Data.Data + Child.Data.PadData
+            with open(SecFile, 'wb') as output_secfile:
+                    output_secfile.write(SecFileData)

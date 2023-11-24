@@ -169,6 +169,9 @@ class SectionNode:
             self.Name = "EFI_SECTION_ALL"
         else:
             self.Name = "SECTION"
+        self.IsPadSection = False
+        self.IsUiSection = False
+        self.IsVerSection = False
         if self.Header.Type in HeaderType:
             self.ExtHeader = self.GetExtHeader(self.Header.Type, buffer[self.Header.Common_Header_Size():], (self.Header.SECTION_SIZE-self.Header.Common_Header_Size()))
             self.HeaderLength = self.Header.Common_Header_Size() + self.ExtHeader.ExtHeaderSize()
@@ -184,7 +187,6 @@ class SectionNode:
         self.OriData = b''
         self.OriHeader = b''
         self.PadData = b''
-        self.IsPadSection = False
         self.SectionMaxAlignment = SECTION_COMMON_ALIGNMENT  # 4-align
 
     def GetExtHeader(self, Type: int, buffer: bytes, nums: int=0) -> None:
@@ -193,8 +195,10 @@ class SectionNode:
         elif Type == 0x02:
             return EFI_GUID_DEFINED_SECTION.from_buffer_copy(buffer)
         elif Type == 0x14:
+            self.IsVerSection = True
             return Get_VERSION_Header((nums - 2)//2).from_buffer_copy(buffer)
         elif Type == 0x15:
+            self.IsUiSection = True
             return Get_USER_INTERFACE_Header(nums//2).from_buffer_copy(buffer)
         elif Type == 0x18:
             return EFI_FREEFORM_SUBTYPE_GUID_SECTION.from_buffer_copy(buffer)

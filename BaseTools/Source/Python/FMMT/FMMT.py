@@ -28,6 +28,10 @@ parser.add_argument("-e", "--Extract", dest="Extract", nargs='+',
                     help="Extract a Ffs Info: '-e inputfile TargetFvName(Optional) TargetFfsName outputfile\
                         If not given TargetFvName, the first found target Ffs will be extracted.\
                         If only given TargetFvName, not given TargetFfsName, the TargetFv will be extracted to output file'")
+parser.add_argument("-E", "--ExtractAll", dest="ExtractAll", nargs='+',
+                    help="Extract a Ffs and section Info: '-E inputfile TargetFvName(Optional) TargetFfsName outputfile\
+                        If not given TargetFvName, the first found target Ffs will be extracted.\
+                        If only given TargetFvName, not given TargetFfsName, the TargetFv will be extracted to output file'")
 parser.add_argument("-a", "--Add", dest="Add", nargs='+',
                     help="Add a Ffs into a FV:'-a inputfile TargetFvName newffsfile outputfile'")
 parser.add_argument("-o", "--Order", dest="Order", nargs='+',
@@ -99,12 +103,12 @@ class FMMT():
         else:
             DeleteFfs(inputfile, self.CheckFfsName(TargetFfs_name), outputfile)
 
-    def Extract(self, inputfile: str, Ffs_name: str, outputfile: str, Fv_name: str=None) -> None:
+    def Extract(self, inputfile: str, Ffs_name: str, outputfile: str, extract_all: bool, Fv_name: str=None) -> None:
         self.SetDestPath(inputfile)
         if Fv_name:
-            ExtractFfs(inputfile, self.CheckFfsName(Ffs_name), outputfile, self.GetFvName(Fv_name))
+            ExtractFfs(inputfile, self.CheckFfsName(Ffs_name), outputfile, self.GetFvName(Fv_name), extract_all)
         else:
-            ExtractFfs(inputfile, self.CheckFfsName(Ffs_name), outputfile)
+            ExtractFfs(inputfile, self.CheckFfsName(Ffs_name), outputfile, extract_all)
 
     def Add(self, inputfile: str, Fv_name: str, newffsfile: str, outputfile: str, order=None) -> None:
         self.SetDestPath(inputfile)
@@ -146,9 +150,14 @@ def main():
                 fmmt.Delete(args.Delete[0],args.Delete[1],args.Delete[2])
         elif args.Extract:
             if len(args.Extract) == 4:
-                fmmt.Extract(args.Extract[0],args.Extract[2],args.Extract[3], args.Extract[1])
+                fmmt.Extract(args.Extract[0],args.Extract[2],args.Extract[3], args.Extract[1], False)
             else:
-                fmmt.Extract(args.Extract[0],args.Extract[1],args.Extract[2])
+                fmmt.Extract(args.Extract[0],args.Extract[1],args.Extract[2], False)
+        elif args.ExtractAll:
+            if len(args.ExtractAll) == 4:
+                fmmt.Extract(args.ExtractAll[0],args.ExtractAll[2],args.ExtractAll[3], args.ExtractAll[1], True)
+            else:
+                fmmt.Extract(args.ExtractAll[0],args.ExtractAll[1],args.ExtractAll[2], True)            
         elif args.Add:
             if args.Order:
                 fmmt.Add(args.Add[0],args.Add[1],args.Add[2],args.Add[3],int(args.Order[0]))
