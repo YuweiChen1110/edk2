@@ -106,7 +106,7 @@ class FMMT():
     def Extract(self, inputfile: str, Ffs_name: str, outputfile: str, extract_all: bool, Fv_name: str=None) -> None:
         self.SetDestPath(inputfile)
         if Fv_name:
-            ExtractFfs(inputfile, self.CheckFfsName(Ffs_name), outputfile, self.GetFvName(Fv_name), extract_all)
+            ExtractFfs(inputfile, self.CheckFfsName(Ffs_name), outputfile, extract_all, self.GetFvName(Fv_name))
         else:
             ExtractFfs(inputfile, self.CheckFfsName(Ffs_name), outputfile, extract_all)
 
@@ -150,12 +150,12 @@ def main():
                 fmmt.Delete(args.Delete[0],args.Delete[1],args.Delete[2])
         elif args.Extract:
             if len(args.Extract) == 4:
-                fmmt.Extract(args.Extract[0],args.Extract[2],args.Extract[3], args.Extract[1], False)
+                fmmt.Extract(args.Extract[0],args.Extract[2],args.Extract[3], False, args.Extract[1])
             else:
                 fmmt.Extract(args.Extract[0],args.Extract[1],args.Extract[2], False)
         elif args.ExtractAll:
             if len(args.ExtractAll) == 4:
-                fmmt.Extract(args.ExtractAll[0],args.ExtractAll[2],args.ExtractAll[3], args.ExtractAll[1], True)
+                fmmt.Extract(args.ExtractAll[0],args.ExtractAll[2],args.ExtractAll[3], True, args.ExtractAll[1])
             else:
                 fmmt.Extract(args.ExtractAll[0],args.ExtractAll[1],args.ExtractAll[2], True)            
         elif args.Add:
