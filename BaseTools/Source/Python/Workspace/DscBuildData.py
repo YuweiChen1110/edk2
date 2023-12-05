@@ -56,6 +56,9 @@ def _IsFieldValueAnArray (Value):
 
 PcdValueInitName = 'PcdValueInit'
 PcdValueCommonName = 'PcdValueCommon'
+PcdCalTokenCnameSizeName = 'PcdCalTokenCnameSize'
+PcdAssignDefaultValueName = 'PcdAssignDefaultValue'
+PcdInitializeFuncName = 'PcdInitializeFunc'
 
 PcdMainCHeader = '''
 /**
@@ -67,7 +70,34 @@ PcdMainCHeader = '''
 #include <stdlib.h>
 #include <string.h>
 #include <PcdValueCommon.h>
+#include "PcdInitializeFunc.c"
 '''
+
+PcdCommonCHeader = '''
+/**
+  DO NOT EDIT
+  FILE auto-generated
+**/
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <PcdValueCommon.h>
+'''
+
+PcdInitializeFuncNameCHeader = """
+/**
+  DO NOT EDIT
+  FILE auto-generated
+**/
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <PcdValueCommon.h>
+#include "PcdCalTokenCnameSize.c"
+#include "PcdAssignDefaultValue.c"
+"""
 
 PcdMainCEntry = '''
 int
@@ -2750,6 +2780,25 @@ class DscBuildData(PlatformBuildClassObject):
                 ccflags.add(item)
             i +=1
         return ccflags
+
+    def GenPcdCalTokenCnameSizeFile(self, AppStr):
+        if not os.path.exists(self.OutputPath):
+            os.makedirs(self.OutputPath)
+        CAppBaseFileName = os.path.join(self.OutputPath, PcdCalTokenCnameSizeName)
+        SaveFileOnChange(CAppBaseFileName + '.c', AppStr, False)
+
+    def GenPcdAssignDefaultValue(self, AppStr):
+        if not os.path.exists(self.OutputPath):
+            os.makedirs(self.OutputPath)
+        CAppBaseFileName = os.path.join(self.OutputPath, PcdAssignDefaultValueName)
+        SaveFileOnChange(CAppBaseFileName + '.c', AppStr, False)
+
+    def GenPcdInitializeFunc(self, AppStr):
+        if not os.path.exists(self.OutputPath):
+            os.makedirs(self.OutputPath)
+        CAppBaseFileName = os.path.join(self.OutputPath, PcdInitializeFuncName)
+        SaveFileOnChange(CAppBaseFileName + '.c', AppStr, False)
+
     def GenerateByteArrayValue (self, StructuredPcds):
         #
         # Generate/Compile/Run C application to determine if there are any flexible array members
@@ -2759,6 +2808,9 @@ class DscBuildData(PlatformBuildClassObject):
 
         InitByteValue = ""
         CApp = PcdMainCHeader
+        PcdCalTokenCnameSizeApp = PcdCommonCHeader
+        PcdAssignDefaultValueApp = PcdCommonCHeader
+        PcdInitializeFuncApp = PcdInitializeFuncNameCHeader
 
         IncludeFiles = set()
         for PcdName in StructuredPcds:
@@ -2767,50 +2819,56 @@ class DscBuildData(PlatformBuildClassObject):
                 if IncludeFile not in IncludeFiles:
                     IncludeFiles.add(IncludeFile)
                     CApp = CApp + '#include <%s>\n' % (IncludeFile)
+                    PcdCalTokenCnameSizeApp += '#include <%s>\n' % (IncludeFile)
+                    PcdAssignDefaultValueApp += '#include <%s>\n' % (IncludeFile)
+                    PcdInitializeFuncApp += '#include <%s>\n' % (IncludeFile)
         CApp = CApp + '\n'
+        PcdCalTokenCnameSizeApp += '\n'
+        PcdAssignDefaultValueApp += '\n'
+        PcdInitializeFuncApp += '\n'
         for Pcd in StructuredPcds.values():
             CApp = CApp + self.GenerateArrayAssignment(Pcd)
         for PcdName in sorted(StructuredPcds.keys()):
             Pcd = StructuredPcds[PcdName]
 
             #create void void Cal_tocken_cname_Size functions
-            CApp = CApp + self.GenerateSizeFunction(Pcd)
+            PcdCalTokenCnameSizeApp += self.GenerateSizeFunction(Pcd)
 
             #create void Assign_ functions
 
             # From DEC
-            CApp = CApp + self.GenerateDefaultValueAssignFunction(Pcd)
+            PcdAssignDefaultValueApp += self.GenerateDefaultValueAssignFunction(Pcd)
             # From Fdf
-            CApp = CApp + self.GenerateFdfValue(Pcd)
+            PcdAssignDefaultValueApp += self.GenerateFdfValue(Pcd)
             # From CommandLine
-            CApp = CApp + self.GenerateCommandLineValue(Pcd)
+            PcdAssignDefaultValueApp += self.GenerateCommandLineValue(Pcd)
 
             # From Dsc Global setting
             if self.SkuOverrideValuesEmpty(Pcd.SkuOverrideValues) or Pcd.Type in [self._PCD_TYPE_STRING_[MODEL_PCD_FIXED_AT_BUILD],
                         self._PCD_TYPE_STRING_[MODEL_PCD_PATCHABLE_IN_MODULE]]:
-                CApp = CApp + self.GenerateInitValueFunction(Pcd, self.SkuIdMgr.SystemSkuId, TAB_DEFAULT_STORES_DEFAULT)
+                PcdAssignDefaultValueApp += self.GenerateInitValueFunction(Pcd, self.SkuIdMgr.SystemSkuId, TAB_DEFAULT_STORES_DEFAULT)
             else:
                 for SkuName in self.SkuIdMgr.SkuOverrideOrder():
                     if SkuName not in Pcd.SkuOverrideValues:
                         continue
                     for DefaultStoreName in Pcd.SkuOverrideValues[SkuName]:
-                        CApp = CApp + self.GenerateInitValueFunction(Pcd, SkuName, DefaultStoreName)
+                        PcdAssignDefaultValueApp += self.GenerateInitValueFunction(Pcd, SkuName, DefaultStoreName)
 
             # From Dsc module scope setting
-            CApp = CApp + self.GenerateModuleScopeValue(Pcd)
+            PcdAssignDefaultValueApp += self.GenerateModuleScopeValue(Pcd)
 
             #create Initialize_ functions
             if self.SkuOverrideValuesEmpty(Pcd.SkuOverrideValues) or Pcd.Type in [self._PCD_TYPE_STRING_[MODEL_PCD_FIXED_AT_BUILD],
                         self._PCD_TYPE_STRING_[MODEL_PCD_PATCHABLE_IN_MODULE]]:
-                InitByteValue, CApp = self.GenerateInitializeFunc(self.SkuIdMgr.SystemSkuId, TAB_DEFAULT_STORES_DEFAULT, Pcd, InitByteValue, CApp)
-                InitByteValue, CApp =  self.GenerateModuleScopeInitializeFunc(self.SkuIdMgr.SystemSkuId,Pcd,InitByteValue,CApp)
+                InitByteValue, PcdInitializeFuncApp = self.GenerateInitializeFunc(self.SkuIdMgr.SystemSkuId, TAB_DEFAULT_STORES_DEFAULT, Pcd, InitByteValue, PcdInitializeFuncApp)
+                InitByteValue, PcdInitializeFuncApp =  self.GenerateModuleScopeInitializeFunc(self.SkuIdMgr.SystemSkuId,Pcd,InitByteValue,PcdInitializeFuncApp)
             else:
                 for SkuName in self.SkuIdMgr.SkuOverrideOrder():
                     if SkuName not in Pcd.SkuOverrideValues:
                         continue
                     for DefaultStoreName in Pcd.DefaultStoreName:
                         Pcd = StructuredPcds[PcdName]
-                        InitByteValue, CApp = self.GenerateInitializeFunc(SkuName, DefaultStoreName, Pcd, InitByteValue, CApp)
+                        InitByteValue, PcdInitializeFuncApp = self.GenerateInitializeFunc(SkuName, DefaultStoreName, Pcd, InitByteValue, PcdInitializeFuncApp)
 
         CApp = CApp + 'VOID\n'
         CApp = CApp + 'PcdEntryPoint(\n'
@@ -2836,6 +2894,10 @@ class DscBuildData(PlatformBuildClassObject):
             os.makedirs(self.OutputPath)
         CAppBaseFileName = os.path.join(self.OutputPath, PcdValueInitName)
         SaveFileOnChange(CAppBaseFileName + '.c', CApp, False)
+
+        self.GenPcdCalTokenCnameSizeFile(PcdCalTokenCnameSizeApp)
+        self.GenPcdAssignDefaultValue(PcdAssignDefaultValueApp)
+        self.GenPcdInitializeFunc(PcdInitializeFuncApp)
 
         # start generating makefile
         MakeApp = PcdMakefileHeader
