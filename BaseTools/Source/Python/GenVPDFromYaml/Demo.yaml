@@ -25,11 +25,6 @@
 #  this notice or any other notice embedded in Materials by Intel or
 #  Intel's suppliers or licensors in any way.
 #
-#  This file contains an 'Intel Peripheral Driver' and is uniquely identified as
-#  "Intel Reference Module" and is licensed for Intel CPUs and chipsets under
-#  the terms of your license agreement with Intel or your vendor. This file may
-#  be modified by the user, subject to additional terms of the license agreement.
-#
 ##
 
 # This section used to define some macro used in this yaml file
