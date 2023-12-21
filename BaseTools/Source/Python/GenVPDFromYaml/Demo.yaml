@@ -1,0 +1,144 @@
+## @file
+#  Platform description.
+#
+# @copyright
+#  INTEL CONFIDENTIAL
+#  Copyright 2023 Intel Corporation.
+#
+#  The source code contained or described herein and all documents related to the
+#  source code ("Material") are owned by Intel Corporation or its suppliers or
+#  licensors. Title to the Material remains with Intel Corporation or its suppliers
+#  and licensors. The Material may contain trade secrets and proprietary and
+#  confidential information of Intel Corporation and its suppliers and licensors,
+#  and is protected by worldwide copyright and trade secret laws and treaty
+#  provisions. No part of the Material may be used, copied, reproduced, modified,
+#  published, uploaded, posted, transmitted, distributed, or disclosed in any way
+#  without Intel's prior express written permission.
+#
+#  No license under any patent, copyright, trade secret or other intellectual
+#  property right is granted to or conferred upon you by disclosure or delivery
+#  of the Materials, either expressly, by implication, inducement, estoppel or
+#  otherwise. Any license under such intellectual property rights must be
+#  express and approved by Intel in writing.
+#
+#  Unless otherwise agreed by Intel in writing, you may not remove or alter
+#  this notice or any other notice embedded in Materials by Intel or
+#  Intel's suppliers or licensors in any way.
+#
+#  This file contains an 'Intel Peripheral Driver' and is uniquely identified as
+#  "Intel Reference Module" and is licensed for Intel CPUs and chipsets under
+#  the terms of your license agreement with Intel or your vendor. This file may
+#  be modified by the user, subject to additional terms of the license agreement.
+#
+##
+
+# This section used to define some macro used in this yaml file
+defines:
+  PASSWORD_MAX_ENCODE_SIZE: 4
+
+# Sku list
+sku:
+  DEFAULT: 0x0
+  NEW_ONE: 0x1
+
+# defaultstore list
+defaultstores:
+  STANDARD: 0
+  MANUFACTURING: 1
+
+# variables list demo
+# variable
+#   - VariableName
+#     - VariableHeaderFile: OvmfPkg/Include/Guid/Variable_1.h
+#     - VariableNameString: L"FastBoot"
+#     - VariablePcdName: gStructPcdTokenSpaceGuid.PcdTestBootMode
+#     - VariableGuid: ee4e5898-3914-4259-9d6e-dc7bd79403cf
+#     - VariableDefaultvalue: 0x00
+#     - VariableAttribute: NV, BS
+variable:
+  - VARIABLE_1:
+    - HeaderFile: OvmfPkg/Include/Guid/Variable_1.h
+    - Name: L"FastBoot"
+    - PcdName: gStructPcdTokenSpaceGuid.PcdTestBootMode
+    - Guid: ee4e5898-3914-4259-9d6e-dc7bd79403cf
+    - Defaultvalue: 0x00
+    - VarAttribute: NV, BS
+  - VARIABLE_2 :
+    - HeaderFile: OvmfPkg/Include/Guid/Variable_2.h
+    - Name: L"TestSetup_SetupVariable"
+    - PcdName: gStructPcdTokenSpaceGuid.PcdTestSetupVariable
+    - Guid: a31280ad-481e-41b6-95e8-127f4c984779
+    - Defaultvalue: 0x00
+    - VarAttribute: NV, BS
+
+# Following DEFAULT.STANDARD setting saves the variable default value,
+# which should add field one by one defined in H structure definition,
+# and it should following the offset sequence
+PcdsDynamicExHii.ARCH_1.DEFAULT.STANDARD:
+  - VARIABLE_1 :
+    - Revision :
+        length   : 0x04
+        value    : 0x01
+  - VARIABLE_2 :
+    - Revision :
+        length   : 0x04
+        value    : 0x01
+    - UserPassword :
+        length   : $(PASSWORD_MAX_ENCODE_SIZE)
+        value    : 0x00
+    - AdminPassword :
+        length   : $(PASSWORD_MAX_ENCODE_SIZE)
+        value    : 0x00
+    - Access :
+        length   : 0x01
+        value    : 0x00    
+    - Numlock :
+        length   : 0x01
+        value    : 0x00
+    - TpmEnable :
+        length   : 0x01
+        value    : 0x00
+    - TpmState :
+        length   : 0x01
+        value    : 0x00
+    - ToolReserved :
+        length   : 0x07
+        value    : 0x00
+    - EnforcedPasswd :
+        length   : 0x01
+        value    : 0x00
+    - TestBreakpoint :
+        length   : 0x02
+        value    : 0x00
+    - SpecialField_1 :
+        length   : 0x01
+        value    : 0x00
+    - SpecialField_2 :
+        length   : 0x01
+        value    : 0x64
+    - TestProfile :
+        length   : 0x01
+        value    : 0xff
+    - TestSupport   :
+        length   : 0x01
+        value    : 0x00
+    - SpecialField_3 :
+        length   : 0x01
+        value    : 0x00
+    - TestPortConfig :
+        length   : 0x04
+        value    : 0x00
+
+# The customized setting only need to promise the variable name and field
+# are in default setting, the value can be customized changed.
+PcdsDynamicExHii.ARCH_1.DEFAULT.MANUFACTURING:
+  - VARIABLE_2 :
+    - SpecialField_3 :
+        length   : 0x01
+        value    : 0x02
+    - SpecialField_1 :
+        length   : 0x01
+        value    : 0x01
+    - SpecialField_2 :
+        length   : 0x01
+        value    : 0x01
