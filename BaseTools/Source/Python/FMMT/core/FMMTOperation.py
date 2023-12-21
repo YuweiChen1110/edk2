@@ -211,14 +211,17 @@ def ExtractFfs(inputfile: str, Ffs_name: str, outputfile: str, extract_all: bool
                 TargetNode.Data.Header.State = c_uint8(
                     ~TargetNode.Data.Header.State)
             FinalData = struct2stream(TargetNode.Data.Header) + TargetNode.Data.Data
-            with open(outputfile, "wb") as f:
-                f.write(FinalData)
-            logger.debug('Extract ffs data is saved in {}.'.format(outputfile))
             if extract_all:
-                outputfolder = os.path.join(os.path.abspath(os.path.dirname(inputfile)), 'extract_'+str(Ffs_name))
+                outputfolder = os.path.join(os.path.abspath(outputfile), 'extract_'+str(Ffs_name))
                 os.makedirs(outputfolder, exist_ok=True)
-                shutil.move(outputfile, os.path.join(outputfolder, outputfile), copy_function=shutil.copy2)
+                newoutputfile = os.path.join(outputfolder, str(Ffs_name) + '.ffs')
+                with open(newoutputfile, "wb") as f:
+                    f.write(FinalData)
                 ExtractSection(TargetNode, str(Ffs_name), outputfolder)
+            else:
+                with open(outputfile, "wb") as f:
+                    f.write(FinalData)
+            logger.debug('Extract ffs data is saved in {}.'.format(outputfile))
     else:
         logger.error('Target Ffs/Fv not found!!!')
         raise Exception('Target Ffs/Fv not found!!!')

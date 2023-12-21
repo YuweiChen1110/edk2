@@ -29,9 +29,8 @@ parser.add_argument("-e", "--Extract", dest="Extract", nargs='+',
                         If not given TargetFvName, the first found target Ffs will be extracted.\
                         If only given TargetFvName, not given TargetFfsName, the TargetFv will be extracted to output file'")
 parser.add_argument("-E", "--ExtractAll", dest="ExtractAll", nargs='+',
-                    help="Extract a Ffs and section Info: '-E inputfile TargetFvName(Optional) TargetFfsName outputfile\
-                        If not given TargetFvName, the first found target Ffs will be extracted.\
-                        If only given TargetFvName, not given TargetFfsName, the TargetFv will be extracted to output file'")
+                    help="Extract a Ffs and section Info: '-E inputfile TargetFvName(Optional) TargetFfsName outputfilefolder\
+                        The TargetFfs and Ver/Ui/Pe32 section of the ffs will all be extracted into outputfilefolder'")
 parser.add_argument("-a", "--Add", dest="Add", nargs='+',
                     help="Add a Ffs into a FV:'-a inputfile TargetFvName newffsfile outputfile'")
 parser.add_argument("-o", "--Order", dest="Order", nargs='+',
